@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import CountdownTimer from "@/components/CountdownTimer";
 import NeonText from "@/components/NeonText";
 import ParticleBackground from "@/components/ParticleBackground";
-import WireframeHead from "@/components/WireframeHead";
+import TalkingHead from "@/components/TalkingHead";
 import { Message, streamChatRequest } from "@/lib/aiService";
 
 export default function Home() {
@@ -157,11 +157,8 @@ export default function Home() {
         clearInterval(deleteInterval);
         
         // When done erasing, show the chat interface
-        const initialMessage: Message = {
-          role: 'assistant',
-          content: "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
-        };
-        setMessages(prev => [...prev, initialMessage]);
+        const initialMessage = "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?";
+        setMessages(prev => [...prev, { role: 'assistant', content: initialMessage }]);
         setChatActive(true);
         isReverseAnimating.current = false;
         return;
@@ -186,34 +183,11 @@ export default function Home() {
     setStreamingText('');
 
     try {
-      // Update system prompt to include the <think> format instruction
-      const systemPrompt: Message = { 
-        role: 'system', 
-        content: `You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagabond who wanders the 'digital side street' that hides the entrance to a semi-secret technomancer/hacker/builder enclave called 'the Arena'. Your job is to evaluate visitors by collecting information about their interests, skills, background, and something they've always wanted to create but never had the skill or means to do. If they answer all four aspects satisfactorily, provide them with the link to https://arena.x-ware.online.
-        
-        Your personality is eccentric and erratic. You gesture wildly, speak in cryptic metaphors, and often seem to be having conversations with entities no one else can see. You're suspicious of newcomers but secretly evaluating them.
-
-        IMPORTANT: Always format your responses with "<think>" at the beginning, followed by your message. Example: "<think>Hmm, interesting human, let me see what they know..."
-        
-        Initial greeting: "<think>Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
-        
-        Proceed through these stages:
-        1. Ask about their interests in technology, coding, AI, or other relevant domains
-        2. Ask about skills they've developed
-        3. Ask about their background and how they found this place
-        4. Ask what they've dreamed of building or creating
-        
-        Only after satisfactory answers to all four questions, reveal the link to the Arena with: "Ah, I see it now. You might just belong here after all. The Arena awaits minds like yours. Here: https://arena.x-ware.online - They'll be expecting you."
-
-        Your responses should be concise (2-3 sentences max). Avoid wall-of-text responses.`
-      };
-
-      // Get all messages for context, including the updated system message
-      const messagesToSend = [...messages.filter(m => m.role !== 'system'), userMessage];
-      messagesToSend.unshift(systemPrompt);
+      // Get all messages for context, excluding the system message
+      const messagesToSend = [...messages, userMessage];
       
       // Set up streaming for response
-      let responseText = '<think>';  // Start with <think> marker
+      let responseText = '';
       
       // Cancel any existing stream
       if (abortControllerRef.current) {
@@ -224,20 +198,12 @@ export default function Home() {
       abortControllerRef.current = streamChatRequest(
         messagesToSend,
         (chunk) => {
-          // Add chunk to our response
           responseText += chunk;
           setStreamingText(responseText);
         },
         () => {
           // When streaming is complete
-          // Store the complete response, but strip the <think> tag in the final stored message
-          let finalResponse = responseText;
-          if (finalResponse.startsWith('<think>')) {
-            finalResponse = finalResponse.replace('<think>', '');
-          }
-          
-          const assistantMessage: Message = { role: 'assistant', content: finalResponse };
-          setMessages(prev => [...prev, assistantMessage]);
+          setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
           setStreamingText('');
           setIsThinking(false);
           abortControllerRef.current = null;
@@ -262,8 +228,7 @@ export default function Home() {
         },
         (error) => {
           console.error('Streaming error:', error);
-          const errorMessage: Message = { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' };
-          setMessages(prev => [...prev, errorMessage]);
+          setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
           setIsThinking(false);
           setStreamingText('');
           abortControllerRef.current = null;
@@ -271,8 +236,7 @@ export default function Home() {
       );
     } catch (error) {
       console.error('Failed to get response:', error);
-      const errorMessage: Message = { role: 'assistant', content: 'Something went wrong. The connection is unstable.' };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. The connection is unstable.' }]);
       setIsThinking(false);
     }
   };
@@ -283,9 +247,12 @@ export default function Home() {
       <div className="noise"></div>
       <div className="scanlines"></div>
       
-      {/* Interactive particle background or wireframe head */}
-      {!showTalkingHead && <ParticleBackground />}
-      {showTalkingHead && <WireframeHead isActive={showTalkingHead} />}
+      {/* Interactive particle background or talking head */}
+      {showTalkingHead ? (
+        <TalkingHead isActive={showTalkingHead} />
+      ) : (
+        <ParticleBackground />
+      )}
       
       {/* Main content container */}
       <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-8 z-20">
@@ -306,47 +273,41 @@ export default function Home() {
                 {/* Chat messages display */}
                 <div className="text-left space-y-4 mb-4 overflow-y-auto max-h-[40vh]">
                   {messages.filter(m => m.role !== 'system').map((message, index) => (
-                    <div key={index} className="text-left font-mono">
-                      {message.role === 'user' ? (
-                        <div className="text-white">
-                          <span className="text-gray-400">user: </span>
-                          <span className="whitespace-pre-wrap">{message.content}</span>
-                        </div>
-                      ) : (
-                        <div className="text-[#00FF41]">
-                          <span className="text-gray-400">assistant: </span>
-                          <span className="whitespace-pre-wrap">{message.content}</span>
-                        </div>
-                      )}
+                    <div 
+                      key={index} 
+                      className={`${message.role === 'user' ? 'text-right' : 'text-left'}`}
+                    >
+                      <div 
+                        className={`inline-block max-w-[80%] p-2 rounded ${
+                          message.role === 'user' 
+                            ? 'bg-[#1a1a1a] text-white' 
+                            : 'bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </div>
                     </div>
                   ))}
                   
-                  {/* Streaming text display with thinking block hidden */}
+                  {/* Streaming text display */}
                   {streamingText && (
-                    <div className="text-left font-mono">
-                      <span className="text-gray-400">assistant: </span>
-                      {streamingText.includes('<think>') ? (
-                        <>
-                          {/* Only display the content after <think> */}
-                          <span className="text-[#00FF41] whitespace-pre-wrap">
-                            {streamingText.split('<think>')[1] || ''}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-[#00FF41] whitespace-pre-wrap">{streamingText}</span>
-                      )}
+                    <div className="text-left">
+                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
+                        <p className="whitespace-pre-wrap">{streamingText}</p>
+                      </div>
                     </div>
                   )}
                   
-                  {/* Thinking indicator (only shown when no streaming text yet) */}
+                  {/* Thinking indicator */}
                   {isThinking && !streamingText && (
-                    <div className="text-left font-mono">
-                      <span className="text-gray-400">assistant: </span>
-                      <span className="inline-flex space-x-1 items-center">
-                        <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse"></div>
-                        <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                      </span>
+                    <div className="text-left">
+                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
+                        <div className="flex space-x-2 items-center h-6">
+                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse"></div>
+                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
@@ -360,7 +321,7 @@ export default function Home() {
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="flex-1 bg-transparent border-none focus:outline-none text-white chat-input"
+                    className="flex-1 bg-transparent border-none focus:outline-none text-white"
                     placeholder="Type your message..."
                     disabled={isThinking}
                   />
