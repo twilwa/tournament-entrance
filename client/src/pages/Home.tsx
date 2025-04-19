@@ -271,28 +271,28 @@ export default function Home() {
             ) : (
               <div className="text-center text-sm md:text-base lg:text-lg tracking-wider font-light leading-relaxed mt-10">
                 {/* Chat messages display */}
-                <div className="text-left space-y-6 mb-4 overflow-y-auto max-h-[40vh]">
+                <div className="text-left space-y-4 mb-4 overflow-y-auto max-h-[40vh]">
                   {messages.filter(m => m.role !== 'system').map((message, index) => (
                     <div 
                       key={index} 
                       className={`${message.role === 'user' ? 'text-right' : 'text-left'}`}
                     >
-                      {message.role === 'user' ? (
-                        <div className="bg-[#333333] text-white inline-block max-w-[80%] p-3 rounded">
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                        </div>
-                      ) : (
-                        <div className="border border-[#00FF41] bg-transparent text-[#00FF41] inline-block max-w-[80%] p-3 rounded">
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                        </div>
-                      )}
+                      <div 
+                        className={`inline-block max-w-[80%] p-2 rounded ${
+                          message.role === 'user' 
+                            ? 'bg-[#1a1a1a] text-white' 
+                            : 'bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </div>
                     </div>
                   ))}
                   
                   {/* Streaming text display */}
                   {streamingText && (
                     <div className="text-left">
-                      <div className="border border-[#00FF41] bg-transparent text-[#00FF41] inline-block max-w-[80%] p-3 rounded">
+                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
                         <p className="whitespace-pre-wrap">{streamingText}</p>
                       </div>
                     </div>
@@ -301,7 +301,7 @@ export default function Home() {
                   {/* Thinking indicator */}
                   {isThinking && !streamingText && (
                     <div className="text-left">
-                      <div className="border border-[#00FF41] bg-transparent text-[#00FF41] inline-block max-w-[80%] p-3 rounded">
+                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
                         <div className="flex space-x-2 items-center h-6">
                           <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse"></div>
                           <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
@@ -314,19 +314,18 @@ export default function Home() {
                   <div ref={messagesEndRef} />
                 </div>
                 
-                {/* Chat input - similar to the reference image */}
-                <div className="mt-6 relative">
-                  <div className="text-[#00FF41] float-left">Type your message...</div>
-                  <div className={`w-3 h-5 float-right ${isThinking ? 'opacity-0' : 'bg-[#00FF41] animate-pulse'}`}></div>
-                  <div className="clear-both h-px mt-2 bg-[#00FF41]/30"></div>
+                {/* Chat input */}
+                <div className="mt-4 flex items-center border-b border-[#00FF41]/30 pb-2">
                   <input
                     type="text"
                     value={userInput}
                     onChange={(e) => setUserInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="w-full bg-transparent border-none focus:outline-none text-white opacity-0 absolute inset-0"
+                    className="flex-1 bg-transparent border-none focus:outline-none text-white"
+                    placeholder="Type your message..."
                     disabled={isThinking}
                   />
+                  <div className={`w-2 h-4 ml-1 ${isThinking ? 'opacity-0' : 'bg-[#00FF41] animate-pulse'}`}></div>
                 </div>
               </div>
             )}

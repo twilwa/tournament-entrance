@@ -32,13 +32,11 @@ export default function TalkingHead({ isActive }: TalkingHeadProps) {
       targetY: number;
       speed: number;
       color: string;
-      type: 'outline' | 'fill' | 'glasses' | 'beard';
     }[] = [];
     
     // Generate random particles across the screen
     const generateParticles = () => {
-      // Create more particles for a clearer image
-      const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 1000);
+      const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 2000);
       
       for (let i = 0; i < particleCount; i++) {
         particles.push({
@@ -47,9 +45,8 @@ export default function TalkingHead({ isActive }: TalkingHeadProps) {
           size: Math.random() * 3 + 1,
           targetX: 0,
           targetY: 0,
-          speed: Math.random() * 0.5 + 0.4, // Slightly faster movement
-          color: `rgba(0, ${Math.floor(Math.random() * 155) + 100}, ${Math.floor(Math.random() * 65)}, ${Math.random() * 0.5 + 0.5})`,
-          type: 'fill'
+          speed: Math.random() * 0.5 + 0.2,
+          color: `rgba(0, ${Math.floor(Math.random() * 155) + 100}, ${Math.floor(Math.random() * 65)}, ${Math.random() * 0.5 + 0.5})`
         });
       }
     };
@@ -63,112 +60,35 @@ export default function TalkingHead({ isActive }: TalkingHeadProps) {
       // Size of the head
       const headSize = Math.min(canvas.width, canvas.height) * 0.4;
       
-      // Generate outline points first
-      const outlineCount = 100; // Number of particles for the head outline
-      const outlineParticles = [];
-      for (let i = 0; i < outlineCount; i++) {
-        const angle = (i / outlineCount) * Math.PI * 2;
-        const x = centerX + Math.cos(angle) * headSize * 0.8;
-        const y = centerY + Math.sin(angle) * headSize * 0.7;
-        
-        // Modify shape for beard and hair
-        let modifiedY = y;
-        if (angle > Math.PI) { // Bottom half - add beard
-          modifiedY += headSize * 0.25 * Math.sin(angle);
-        } else if (angle > Math.PI/2 && angle < Math.PI*3/2) { // Top half - add hair
-          modifiedY -= headSize * 0.1 * Math.sin(angle * 2);
-        }
-        
-        outlineParticles.push({
-          x: x,
-          y: modifiedY,
-          size: 3, // Larger particles for outline
-          color: "rgba(0, 255, 65, 0.9)",
-          type: 'outline'
-        });
-      }
-      
-      // Add glasses
-      const glassesParticles = [];
-      
-      // Left glasses
-      for (let i = 0; i < 30; i++) {
-        const theta = (i / 30) * Math.PI * 2;
-        const x = centerX - headSize * 0.25 + Math.cos(theta) * headSize * 0.15;
-        const y = centerY - headSize * 0.1 + Math.sin(theta) * headSize * 0.1;
-        glassesParticles.push({
-          x, y,
-          size: 2,
-          color: "rgba(0, 255, 65, 0.9)",
-          type: 'glasses'
-        });
-      }
-      
-      // Right glasses
-      for (let i = 0; i < 30; i++) {
-        const theta = (i / 30) * Math.PI * 2;
-        const x = centerX + headSize * 0.25 + Math.cos(theta) * headSize * 0.15;
-        const y = centerY - headSize * 0.1 + Math.sin(theta) * headSize * 0.1;
-        glassesParticles.push({
-          x, y,
-          size: 2,
-          color: "rgba(0, 255, 65, 0.9)",
-          type: 'glasses'
-        });
-      }
-      
-      // Add beard particles
-      const beardParticles = [];
-      for (let i = 0; i < 50; i++) {
-        const angle = Math.PI / 2 + (i / 50) * Math.PI;
-        const dist = headSize * (0.7 + Math.random() * 0.3);
-        const x = centerX + Math.cos(angle) * dist * 0.8;
-        const y = centerY + Math.sin(angle) * dist;
-        beardParticles.push({
-          x, y,
-          size: 2 + Math.random() * 2,
-          color: "rgba(0, 255, 65, 0.7)",
-          type: 'beard'
-        });
-      }
-      
-      // Combine target positions
-      const targetPositions = [
-        ...outlineParticles,
-        ...glassesParticles,
-        ...beardParticles
-      ];
-      
-      // Assign target positions to particles
-      for (let i = 0; i < Math.min(particles.length, targetPositions.length); i++) {
-        const targetPos = targetPositions[i];
-        particles[i].targetX = targetPos.x;
-        particles[i].targetY = targetPos.y;
-        particles[i].color = targetPos.color;
-        particles[i].size = targetPos.size;
-        particles[i].type = targetPos.type;
-      }
-      
-      // For any remaining particles, distribute them randomly within the head shape
-      for (let i = targetPositions.length; i < particles.length; i++) {
+      // Calculate positions to form a bearded figure with long hair
+      for (let i = 0; i < particles.length; i++) {
         const particle = particles[i];
         const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * headSize * 0.7;
+        const distance = Math.random() * headSize;
         
         // Base head shape (circle)
         let x = centerX + Math.cos(angle) * distance;
         let y = centerY + Math.sin(angle) * distance;
         
         // Modify to make it look like a bearded figure
+        // Add more particles to beard area
         if (Math.random() > 0.5 && y > centerY) {
-          // Beard area
-          y += Math.random() * headSize * 0.3;
-          particle.color = "rgba(0, 255, 65, 0.6)";
-          particle.type = 'beard';
-        } else {
-          // General fill
-          particle.color = `rgba(0, ${Math.floor(Math.random() * 155) + 100}, ${Math.floor(Math.random() * 65)}, ${Math.random() * 0.3 + 0.2})`;
-          particle.type = 'fill';
+          y += Math.random() * headSize * 0.5;
+        }
+        
+        // Add more particles to hair area
+        if (Math.random() > 0.7 && Math.abs(x - centerX) > headSize * 0.3) {
+          y -= Math.random() * headSize * 0.3;
+        }
+        
+        // Add rectangular glasses
+        if (Math.random() > 0.7 && 
+            Math.abs(y - (centerY - headSize * 0.15)) < headSize * 0.05) {
+          if ((Math.abs(x - (centerX - headSize * 0.2)) < headSize * 0.1) || 
+              (Math.abs(x - (centerX + headSize * 0.2)) < headSize * 0.1)) {
+            // These are glasses
+            particle.color = "rgba(0, 255, 65, 0.9)";
+          }
         }
         
         particle.targetX = x;

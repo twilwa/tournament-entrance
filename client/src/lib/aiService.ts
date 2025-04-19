@@ -110,11 +110,6 @@ export function streamChatRequest(
               if (data.content) {
                 onChunk(data.content);
               }
-              if (data.thinking !== undefined) {
-                // Handle thinking state changes
-                // We don't pass this to onChunk as we'll handle thinking separately
-                console.log("Thinking state:", data.thinking);
-              }
               if (data.error) {
                 throw new Error(data.error);
               }
