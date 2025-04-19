@@ -1,14 +1,20 @@
+import { Router } from "express";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { handleChatCompletion, handleStreamingChatCompletion } from "./ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // API routes - prefix all routes with /api
+  const apiRouter = Router();
+  
+  // AI endpoints
+  apiRouter.post("/chat", handleChatCompletion);
+  apiRouter.post("/chat/stream", handleStreamingChatCompletion);
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
-
+  // Apply API routes
+  app.use("/api", apiRouter);
+  
   const httpServer = createServer(app);
 
   return httpServer;
