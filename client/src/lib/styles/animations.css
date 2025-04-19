@@ -85,6 +85,18 @@
   }
 }
 
+/* Pulsing glow animation for cursor and elements */
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1;
+    box-shadow: 0 0 5px #00FF41, 0 0 10px #00FF41;
+  }
+  50% { 
+    opacity: 0.7;
+    box-shadow: 0 0 10px #00FF41, 0 0 20px #00FF41, 0 0 30px #00FF41;
+  }
+}
+
 /* Digital clock styling */
 .digital-clock {
   font-family: 'Share Tech Mono', monospace;
@@ -107,6 +119,20 @@
 
 .animate-pulse-slow {
   animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+/* Glowing cursor/dot */
+.green-dot-cursor {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #00FF41;
+  box-shadow: 0 0 5px #00FF41, 0 0 10px #00FF41;
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
 /* Custom highlight selection */

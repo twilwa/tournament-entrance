@@ -325,7 +325,8 @@ export default function Home() {
                     placeholder="Type your message..."
                     disabled={isThinking}
                   />
-                  <div className={`w-2 h-4 ml-1 ${isThinking ? 'opacity-0' : 'bg-[#00FF41] animate-pulse'}`}></div>
+                  {/* Glowing green dot cursor/indicator */}
+                  <div className={`green-dot-cursor ml-2 ${isThinking ? 'opacity-0' : ''}`}></div>
                 </div>
               </div>
             )}
