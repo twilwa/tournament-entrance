@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+@import './lib/styles/animations.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,5 +12,20 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    background-color: black;
+    color: white;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  
+  /* Custom cursor styling */
+  .chat-input {
+    caret-color: #00FF41 !important; /* Set the cursor color to neon green */
+  }
+  
+  /* Custom text selection */
+  ::selection {
+    background-color: rgba(0, 255, 65, 0.3);
+    color: white;
   }
 }
