@@ -19,14 +19,14 @@ export default function ParticleBackground() {
         window.particlesJS("particles-js", {
           "particles": {
             "number": {
-              "value": 40,
+              "value": 25,
               "density": {
                 "enable": true,
                 "value_area": 800
               }
             },
             "color": {
-              "value": ["#FF2E9D", "#0CEAFF", "#541EBE"]
+              "value": ["#00FF41", "#007320", "#00A032"]
             },
             "shape": {
               "type": "circle",
@@ -36,7 +36,7 @@ export default function ParticleBackground() {
               }
             },
             "opacity": {
-              "value": 0.4,
+              "value": 0.3,
               "random": true,
               "anim": {
                 "enable": true,
@@ -46,11 +46,11 @@ export default function ParticleBackground() {
               }
             },
             "size": {
-              "value": 2,
+              "value": 1.5,
               "random": true,
               "anim": {
                 "enable": true,
-                "speed": 2,
+                "speed": 1,
                 "size_min": 0.1,
                 "sync": false
               }
@@ -58,13 +58,13 @@ export default function ParticleBackground() {
             "line_linked": {
               "enable": true,
               "distance": 150,
-              "color": "#0CEAFF",
+              "color": "#00FF41",
               "opacity": 0.2,
               "width": 1
             },
             "move": {
               "enable": true,
-              "speed": 0.5,
+              "speed": 0.3,
               "direction": "none",
               "random": true,
               "straight": false,
@@ -98,7 +98,7 @@ export default function ParticleBackground() {
                 }
               },
               "push": {
-                "particles_nb": 4
+                "particles_nb": 3
               }
             }
           },

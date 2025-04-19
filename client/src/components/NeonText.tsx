@@ -25,9 +25,8 @@ export default function NeonText({ children }: NeonTextProps) {
       }
       
       // Add occasional glitch effect
-      if (Math.random() > 0.98) {
-        const color = Math.random() > 0.5 ? '#FF2E9D' : '#0CEAFF';
-        textElement.style.textShadow = `0 0 5px #fff, 0 0 10px #fff, 0 0 15px ${color}, 0 0 20px ${color}`;
+      if (Math.random() > 0.98 && textElement) {
+        textElement.style.textShadow = `0 0 5px #fff, 0 0 10px #00FF41, 0 0 15px #00FF41`;
         
         setTimeout(() => {
           if (textElement) {
@@ -49,8 +48,8 @@ export default function NeonText({ children }: NeonTextProps) {
   return (
     <p 
       ref={textRef} 
-      className="text-center text-sm md:text-base lg:text-lg tracking-wider font-light leading-relaxed animate-flicker"
-      style={{ opacity: flickerIntensity }}
+      className="text-center text-sm md:text-base lg:text-lg tracking-wider font-light leading-relaxed animate-flicker mt-10"
+      style={{ opacity: flickerIntensity, color: "#eeeeee" }}
     >
       {children}
     </p>
