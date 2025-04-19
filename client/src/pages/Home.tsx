@@ -157,8 +157,11 @@ export default function Home() {
         clearInterval(deleteInterval);
         
         // When done erasing, show the chat interface
-        const initialMessage = "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?";
-        setMessages(prev => [...prev, { role: 'assistant', content: initialMessage }]);
+        const initialMessage: Message = {
+          role: 'assistant',
+          content: "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
+        };
+        setMessages(prev => [...prev, initialMessage]);
         setChatActive(true);
         isReverseAnimating.current = false;
         return;
@@ -184,7 +187,7 @@ export default function Home() {
 
     try {
       // Update system prompt to include the <think> format instruction
-      const systemPrompt = { 
+      const systemPrompt: Message = { 
         role: 'system', 
         content: `You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagabond who wanders the 'digital side street' that hides the entrance to a semi-secret technomancer/hacker/builder enclave called 'the Arena'. Your job is to evaluate visitors by collecting information about their interests, skills, background, and something they've always wanted to create but never had the skill or means to do. If they answer all four aspects satisfactorily, provide them with the link to https://arena.x-ware.online.
         
@@ -233,7 +236,8 @@ export default function Home() {
             finalResponse = finalResponse.replace('<think>', '');
           }
           
-          setMessages(prev => [...prev, { role: 'assistant', content: finalResponse }]);
+          const assistantMessage: Message = { role: 'assistant', content: finalResponse };
+          setMessages(prev => [...prev, assistantMessage]);
           setStreamingText('');
           setIsThinking(false);
           abortControllerRef.current = null;
@@ -258,7 +262,8 @@ export default function Home() {
         },
         (error) => {
           console.error('Streaming error:', error);
-          setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
+          const errorMessage: Message = { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' };
+          setMessages(prev => [...prev, errorMessage]);
           setIsThinking(false);
           setStreamingText('');
           abortControllerRef.current = null;
@@ -266,7 +271,8 @@ export default function Home() {
       );
     } catch (error) {
       console.error('Failed to get response:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. The connection is unstable.' }]);
+      const errorMessage: Message = { role: 'assistant', content: 'Something went wrong. The connection is unstable.' };
+      setMessages(prev => [...prev, errorMessage]);
       setIsThinking(false);
     }
   };
