@@ -55,6 +55,34 @@ export default function Home() {
   
   // Interactive effects
   useEffect(() => {
+    // Click effect
+    const handleClick = (event: MouseEvent) => {
+      // Add a ripple effect on click
+      const ripple = document.createElement("div");
+      ripple.classList.add("fixed", "rounded-full", "pointer-events-none", "z-30");
+      ripple.style.width = "10px";
+      ripple.style.height = "10px";
+      ripple.style.left = event.clientX - 5 + "px";
+      ripple.style.top = event.clientY - 5 + "px";
+      ripple.style.background = "#00FF41"; // Neon green
+      ripple.style.opacity = "0.8";
+      ripple.style.transition = "all 0.6s ease-out";
+
+      document.body.appendChild(ripple);
+
+      setTimeout(() => {
+        ripple.style.width = "300px";
+        ripple.style.height = "300px";
+        ripple.style.left = event.clientX - 150 + "px";
+        ripple.style.top = event.clientY - 150 + "px";
+        ripple.style.opacity = "0";
+      }, 10);
+
+      setTimeout(() => {
+        document.body.removeChild(ripple);
+      }, 600);
+    };
+
     // Keydown effect
     const handleKeydown = () => {
       // Add a flash effect on keypress
@@ -91,11 +119,13 @@ export default function Home() {
     };
 
     // Register event listeners
+    document.addEventListener("click", handleClick);
     document.addEventListener("keydown", handleKeydown);
     document.addEventListener("mousemove", handleMouseMove);
 
     return () => {
       // Clean up event listeners
+      document.removeEventListener("click", handleClick);
       document.removeEventListener("keydown", handleKeydown);
       document.removeEventListener("mousemove", handleMouseMove);
     };
