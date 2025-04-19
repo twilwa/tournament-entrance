@@ -40,34 +40,44 @@ function FloatingPolygons() {
       opacity: number;
     }[] = [];
     
-    // Generate random polygons
+    // Generate random wireframe polygons
     const generatePolygons = () => {
-      const count = Math.min(15, Math.max(5, Math.floor(window.innerWidth * window.innerHeight / 90000)));
+      const count = Math.min(20, Math.max(8, Math.floor(window.innerWidth * window.innerHeight / 70000)));
       
       for (let i = 0; i < count; i++) {
-        const sides = Math.floor(Math.random() * 4) + 3; // 3 to 6 sides
+        // Generate more complex wireframe shapes with more sides
+        const sides = Math.floor(Math.random() * 5) + 3; // 3 to 7 sides
+        
+        // For wireframes, we can make them larger since they're not solid
+        const size = Math.random() * 60 + 20; // Size between 20-80
+        
         polygons.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          size: Math.random() * 40 + 10, // Size between 10-50
+          size: size, 
           sides: sides,
           rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: (Math.random() - 0.5) * 0.01,
-          speedX: (Math.random() - 0.5) * 0.5,
-          speedY: (Math.random() - 0.5) * 0.5,
+          rotationSpeed: (Math.random() - 0.5) * 0.005, // Slower rotation for larger shapes
+          speedX: (Math.random() - 0.5) * 0.3, // Slower movement
+          speedY: (Math.random() - 0.5) * 0.3, // Slower movement
           color: `rgba(0, ${Math.floor(Math.random() * 155) + 100}, ${Math.floor(Math.random() * 65)}, 0.2)`,
           opacity: Math.random() * 0.2 + 0.1
         });
       }
     };
     
-    // Draw a polygon
+    // Draw a wireframe polygon
     const drawPolygon = (x: number, y: number, size: number, sides: number, rotation: number, color: string) => {
+      // Draw the outline only
       ctx.beginPath();
+      
+      // Calculate all the points
+      const points = [];
       for (let i = 0; i < sides; i++) {
         const angle = rotation + (i * 2 * Math.PI / sides);
         const pointX = x + size * Math.cos(angle);
         const pointY = y + size * Math.sin(angle);
+        points.push({ x: pointX, y: pointY });
         
         if (i === 0) {
           ctx.moveTo(pointX, pointY);
@@ -76,11 +86,27 @@ function FloatingPolygons() {
         }
       }
       ctx.closePath();
-      ctx.fillStyle = color;
+      
+      // Set styles for wireframe
       ctx.strokeStyle = 'rgba(0, 255, 65, 0.3)';
       ctx.lineWidth = 0.5;
-      ctx.fill();
       ctx.stroke();
+      
+      // Draw inner connection lines for complex shapes (if more than 3 sides)
+      if (sides > 3) {
+        ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+          for (let j = i + 2; j < sides; j++) {
+            if (j !== i + sides - 1) { // Skip directly opposite vertices for even-sided polygons
+              ctx.moveTo(points[i].x, points[i].y);
+              ctx.lineTo(points[j].x, points[j].y);
+            }
+          }
+        }
+        ctx.strokeStyle = 'rgba(0, 255, 65, 0.15)';
+        ctx.lineWidth = 0.3;
+        ctx.stroke();
+      }
     };
     
     // Animate polygons
