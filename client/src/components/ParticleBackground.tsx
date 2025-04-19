@@ -1,9 +1,134 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 declare global {
   interface Window {
     particlesJS: any;
   }
+}
+
+// Custom polygons component with floating shapes
+function FloatingPolygons() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Resize canvas to fill window
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Create polygons
+    const polygons: {
+      x: number;
+      y: number;
+      size: number;
+      sides: number;
+      rotation: number;
+      rotationSpeed: number;
+      speedX: number;
+      speedY: number;
+      color: string;
+      opacity: number;
+    }[] = [];
+    
+    // Generate random polygons
+    const generatePolygons = () => {
+      const count = Math.min(15, Math.max(5, Math.floor(window.innerWidth * window.innerHeight / 90000)));
+      
+      for (let i = 0; i < count; i++) {
+        const sides = Math.floor(Math.random() * 4) + 3; // 3 to 6 sides
+        polygons.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: Math.random() * 40 + 10, // Size between 10-50
+          sides: sides,
+          rotation: Math.random() * Math.PI * 2,
+          rotationSpeed: (Math.random() - 0.5) * 0.01,
+          speedX: (Math.random() - 0.5) * 0.5,
+          speedY: (Math.random() - 0.5) * 0.5,
+          color: `rgba(0, ${Math.floor(Math.random() * 155) + 100}, ${Math.floor(Math.random() * 65)}, 0.2)`,
+          opacity: Math.random() * 0.2 + 0.1
+        });
+      }
+    };
+    
+    // Draw a polygon
+    const drawPolygon = (x: number, y: number, size: number, sides: number, rotation: number, color: string) => {
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const angle = rotation + (i * 2 * Math.PI / sides);
+        const pointX = x + size * Math.cos(angle);
+        const pointY = y + size * Math.sin(angle);
+        
+        if (i === 0) {
+          ctx.moveTo(pointX, pointY);
+        } else {
+          ctx.lineTo(pointX, pointY);
+        }
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = 'rgba(0, 255, 65, 0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.fill();
+      ctx.stroke();
+    };
+    
+    // Animate polygons
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      for (const polygon of polygons) {
+        // Move polygon
+        polygon.x += polygon.speedX;
+        polygon.y += polygon.speedY;
+        polygon.rotation += polygon.rotationSpeed;
+        
+        // Bounce off edges
+        if (polygon.x < -polygon.size || polygon.x > canvas.width + polygon.size) {
+          polygon.speedX *= -1;
+        }
+        if (polygon.y < -polygon.size || polygon.y > canvas.height + polygon.size) {
+          polygon.speedY *= -1;
+        }
+        
+        // Draw polygon
+        drawPolygon(
+          polygon.x, 
+          polygon.y, 
+          polygon.size, 
+          polygon.sides, 
+          polygon.rotation, 
+          polygon.color
+        );
+      }
+      
+      requestAnimationFrame(animate);
+    };
+    
+    generatePolygons();
+    animate();
+    
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, []);
+  
+  return (
+    <canvas 
+      ref={canvasRef}
+      className="fixed inset-0 z-0 pointer-events-none"
+    />
+  );
 }
 
 export default function ParticleBackground() {
@@ -85,7 +210,7 @@ export default function ParticleBackground() {
                 "mode": "grab"
               },
               "onclick": {
-                "enable": true,
+                "enable": false, // Disabled click effects
                 "mode": "push"
               },
               "resize": true
@@ -94,11 +219,8 @@ export default function ParticleBackground() {
               "grab": {
                 "distance": 140,
                 "line_linked": {
-                  "opacity": 0.8
+                  "opacity": 0.5
                 }
-              },
-              "push": {
-                "particles_nb": 3
               }
             }
           },
@@ -117,5 +239,10 @@ export default function ParticleBackground() {
     };
   }, []);
 
-  return <div id="particles-js" className="fixed inset-0 z-0"></div>;
+  return (
+    <>
+      <div id="particles-js" className="fixed inset-0 z-0"></div>
+      <FloatingPolygons />
+    </>
+  );
 }
