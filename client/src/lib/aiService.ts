@@ -128,8 +128,9 @@ export function streamChatRequest(
         controller = null;
         onDone();
       }
-    } catch (error) {
-      if (error.name === 'AbortError') {
+    } catch (err: unknown) {
+      const error = err as Error;
+      if (error instanceof Error && error.name === 'AbortError') {
         // Intentional abort, not an error
         return;
       }

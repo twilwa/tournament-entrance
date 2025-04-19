@@ -66,7 +66,7 @@ export default function NeonText({ children, onMirageClick }: NeonTextProps) {
       <>
         {before}
         <span 
-          className="cursor-pointer hover:text-[#00FF41] transition-colors duration-300"
+          className="cursor-text"
           onClick={onMirageClick}
           style={{ textDecoration: 'none' }}
         >

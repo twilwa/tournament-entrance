@@ -2,16 +2,56 @@ import { useEffect, useState, useRef } from "react";
 import CountdownTimer from "@/components/CountdownTimer";
 import NeonText from "@/components/NeonText";
 import ParticleBackground from "@/components/ParticleBackground";
-import ChatBot from "@/components/ChatBot";
 import TalkingHead from "@/components/TalkingHead";
+import { Message, streamChatRequest } from "@/lib/aiService";
 
 export default function Home() {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatActive, setChatActive] = useState(false);
   const [showTalkingHead, setShowTalkingHead] = useState(false);
   const [textContent, setTextContent] = useState<string>(
     "You've stumbled upon a door where your mind is the key. There are none who will lend you guidance; these trials are yours to conquer alone. Entering here will take more than mere logic and strategy, but the criteria are just as hidden as what they reveal. Find yourself, and you will find the very thing hidden underneath everything you thought you knew. Beyond here is something like a utopia — beyond here... this is a mirage."
   );
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      role: 'system', 
+      content: `You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagabond who wanders the 'digital side street' that hides the entrance to a semi-secret technomancer/hacker/builder enclave called 'the Arena'. Your job is to evaluate visitors by collecting information about their interests, skills, background, and something they've always wanted to create but never had the skill or means to do. If they answer all four aspects satisfactorily, provide them with the link to https://arena.x-ware.online.
+      
+      Your personality is eccentric and erratic. You gesture wildly, speak in cryptic metaphors, and often seem to be having conversations with entities no one else can see. You're suspicious of newcomers but secretly evaluating them.
+      
+      Initial greeting: "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
+      
+      Proceed through these stages:
+      1. Ask about their interests in technology, coding, AI, or other relevant domains
+      2. Ask about skills they've developed
+      3. Ask about their background and how they found this place
+      4. Ask what they've dreamed of building or creating
+      
+      Only after satisfactory answers to all four questions, reveal the link to the Arena with: "Ah, I see it now. You might just belong here after all. The Arena awaits minds like yours. Here: https://arena.x-ware.online - They'll be expecting you."
+
+      Your responses should be concise (2-3 sentences max). Avoid wall-of-text responses.`
+    }
+  ]);
+  
+  const [userInput, setUserInput] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  
   const isReverseAnimating = useRef(false);
+  const abortControllerRef = useRef<(() => void) | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Track progress through conversation
+  const [userProgress, setUserProgress] = useState({
+    interests: false,
+    skills: false,
+    background: false,
+    dreams: false
+  });
+  
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, streamingText]);
   
   // Interactive effects
   useEffect(() => {
@@ -91,35 +131,114 @@ export default function Home() {
     };
   }, []);
 
+  // Clean up any active streams when component unmounts
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current();
+      }
+    };
+  }, []);
+
   // Handle mirage text click and reverse typing animation
   const handleMirageClick = () => {
-    if (isReverseAnimating.current || isChatOpen) return;
+    if (isReverseAnimating.current || chatActive) return;
     isReverseAnimating.current = true;
     
     // Start showing the talking head
     setShowTalkingHead(true);
     
-    // Start reverse typing animation
+    // Start reverse typing animation (much faster now)
     let currentText = textContent;
+    const deleteCharsPerTick = 3; // Delete multiple characters per tick for speed
+    
     const deleteInterval = setInterval(() => {
       if (currentText.length <= 0) {
         clearInterval(deleteInterval);
         
-        // When done erasing, show the chat and update text
-        setTextContent("Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?");
-        setIsChatOpen(true);
+        // When done erasing, show the chat interface
+        const initialMessage = "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?";
+        setMessages(prev => [...prev, { role: 'assistant', content: initialMessage }]);
+        setChatActive(true);
         isReverseAnimating.current = false;
         return;
       }
       
-      currentText = currentText.slice(0, -1);
+      // Delete multiple characters at once for faster animation
+      const charsToDelete = Math.min(deleteCharsPerTick, currentText.length);
+      currentText = currentText.slice(0, -charsToDelete);
       setTextContent(currentText);
-    }, 30); // Speed of deletion (lower = faster)
+    }, 10); // Much faster deletion timer
   };
 
-  // Handle chat close
-  const handleChatClose = () => {
-    setIsChatOpen(false);
+  // Send message to the AI
+  const handleSendMessage = async () => {
+    if (!userInput.trim() || isThinking) return;
+    
+    // Add user message
+    const userMessage: Message = { role: 'user', content: userInput };
+    setMessages(prev => [...prev, userMessage]);
+    setUserInput('');
+    setIsThinking(true);
+    setStreamingText('');
+
+    try {
+      // Get all messages for context, excluding the system message
+      const messagesToSend = [...messages, userMessage];
+      
+      // Set up streaming for response
+      let responseText = '';
+      
+      // Cancel any existing stream
+      if (abortControllerRef.current) {
+        abortControllerRef.current();
+      }
+      
+      // Start streaming the response
+      abortControllerRef.current = streamChatRequest(
+        messagesToSend,
+        (chunk) => {
+          responseText += chunk;
+          setStreamingText(responseText);
+        },
+        () => {
+          // When streaming is complete
+          setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
+          setStreamingText('');
+          setIsThinking(false);
+          abortControllerRef.current = null;
+          
+          // Check for completion markers in the response
+          const lowerResponse = responseText.toLowerCase();
+          if (!userProgress.interests && (lowerResponse.includes('interest') || lowerResponse.includes('passion'))) {
+            setUserProgress(prev => ({ ...prev, interests: true }));
+          }
+          else if (userProgress.interests && !userProgress.skills && 
+                  (lowerResponse.includes('skill') || lowerResponse.includes('tool') || lowerResponse.includes('language'))) {
+            setUserProgress(prev => ({ ...prev, skills: true }));
+          }
+          else if (userProgress.interests && userProgress.skills && !userProgress.background && 
+                  (lowerResponse.includes('background') || lowerResponse.includes('history'))) {
+            setUserProgress(prev => ({ ...prev, background: true }));
+          }
+          else if (userProgress.interests && userProgress.skills && userProgress.background && !userProgress.dreams && 
+                  (lowerResponse.includes('dream') || lowerResponse.includes('create') || lowerResponse.includes('build'))) {
+            setUserProgress(prev => ({ ...prev, dreams: true }));
+          }
+        },
+        (error) => {
+          console.error('Streaming error:', error);
+          setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
+          setIsThinking(false);
+          setStreamingText('');
+          abortControllerRef.current = null;
+        }
+      );
+    } catch (error) {
+      console.error('Failed to get response:', error);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. The connection is unstable.' }]);
+      setIsThinking(false);
+    }
   };
 
   return (
@@ -143,17 +262,76 @@ export default function Home() {
             <CountdownTimer targetDate="May 30, 2025 00:00:00" />
           </div>
           
-          {/* Main message */}
+          {/* Main message area - transforms into chat interface */}
           <div className="max-w-xl mx-auto">
-            <NeonText onMirageClick={handleMirageClick}>
-              {textContent}
-            </NeonText>
+            {!chatActive ? (
+              <NeonText onMirageClick={handleMirageClick}>
+                {textContent}
+              </NeonText>
+            ) : (
+              <div className="text-center text-sm md:text-base lg:text-lg tracking-wider font-light leading-relaxed mt-10">
+                {/* Chat messages display */}
+                <div className="text-left space-y-4 mb-4 overflow-y-auto max-h-[40vh]">
+                  {messages.filter(m => m.role !== 'system').map((message, index) => (
+                    <div 
+                      key={index} 
+                      className={`${message.role === 'user' ? 'text-right' : 'text-left'}`}
+                    >
+                      <div 
+                        className={`inline-block max-w-[80%] p-2 rounded ${
+                          message.role === 'user' 
+                            ? 'bg-[#1a1a1a] text-white' 
+                            : 'bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Streaming text display */}
+                  {streamingText && (
+                    <div className="text-left">
+                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
+                        <p className="whitespace-pre-wrap">{streamingText}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Thinking indicator */}
+                  {isThinking && !streamingText && (
+                    <div className="text-left">
+                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
+                        <div className="flex space-x-2 items-center h-6">
+                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse"></div>
+                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div ref={messagesEndRef} />
+                </div>
+                
+                {/* Chat input */}
+                <div className="mt-4 flex items-center border-b border-[#00FF41]/30 pb-2">
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    className="flex-1 bg-transparent border-none focus:outline-none text-white"
+                    placeholder="Type your message..."
+                    disabled={isThinking}
+                  />
+                  <div className={`w-2 h-4 ml-1 ${isThinking ? 'opacity-0' : 'bg-[#00FF41] animate-pulse'}`}></div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-      
-      {/* Hidden chatbot */}
-      <ChatBot isOpen={isChatOpen} onClose={handleChatClose} />
     </div>
   );
 }
