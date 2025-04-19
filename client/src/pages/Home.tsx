@@ -1,9 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import CountdownTimer from "@/components/CountdownTimer";
 import NeonText from "@/components/NeonText";
 import ParticleBackground from "@/components/ParticleBackground";
+import ChatBot from "@/components/ChatBot";
+import TalkingHead from "@/components/TalkingHead";
 
 export default function Home() {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showTalkingHead, setShowTalkingHead] = useState(false);
+  const [textContent, setTextContent] = useState<string>(
+    "You've stumbled upon a door where your mind is the key. There are none who will lend you guidance; these trials are yours to conquer alone. Entering here will take more than mere logic and strategy, but the criteria are just as hidden as what they reveal. Find yourself, and you will find the very thing hidden underneath everything you thought you knew. Beyond here is something like a utopia — beyond here... this is a mirage."
+  );
+  const isReverseAnimating = useRef(false);
+  
   // Interactive effects
   useEffect(() => {
     // Click effect
@@ -82,14 +91,49 @@ export default function Home() {
     };
   }, []);
 
+  // Handle mirage text click and reverse typing animation
+  const handleMirageClick = () => {
+    if (isReverseAnimating.current || isChatOpen) return;
+    isReverseAnimating.current = true;
+    
+    // Start showing the talking head
+    setShowTalkingHead(true);
+    
+    // Start reverse typing animation
+    let currentText = textContent;
+    const deleteInterval = setInterval(() => {
+      if (currentText.length <= 0) {
+        clearInterval(deleteInterval);
+        
+        // When done erasing, show the chat and update text
+        setTextContent("Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?");
+        setIsChatOpen(true);
+        isReverseAnimating.current = false;
+        return;
+      }
+      
+      currentText = currentText.slice(0, -1);
+      setTextContent(currentText);
+    }, 30); // Speed of deletion (lower = faster)
+  };
+
+  // Handle chat close
+  const handleChatClose = () => {
+    setIsChatOpen(false);
+  };
+
   return (
     <div className="bg-black text-white font-['Share_Tech_Mono'] overflow-hidden">
       {/* Noise and scanline effects */}
       <div className="noise"></div>
       <div className="scanlines"></div>
       
-      {/* Interactive particle background */}
-      <ParticleBackground />
+      {/* Interactive particle background or talking head */}
+      {showTalkingHead ? (
+        <TalkingHead isActive={showTalkingHead} />
+      ) : (
+        <ParticleBackground />
+      )}
       
       {/* Main content container */}
       <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-8 z-20">
@@ -101,12 +145,15 @@ export default function Home() {
           
           {/* Main message */}
           <div className="max-w-xl mx-auto">
-            <NeonText>
-              You've stumbled upon a door where your mind is the key. There are none who will lend you guidance; these trials are yours to conquer alone. Entering here will take more than mere logic and strategy, but the criteria are just as hidden as what they reveal. Find yourself, and you will find the very thing hidden underneath everything you thought you knew. Beyond here is something like a utopia — beyond here... this is a mirage.
+            <NeonText onMirageClick={handleMirageClick}>
+              {textContent}
             </NeonText>
           </div>
         </div>
       </div>
+      
+      {/* Hidden chatbot */}
+      <ChatBot isOpen={isChatOpen} onClose={handleChatClose} />
     </div>
   );
 }

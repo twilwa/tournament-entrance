@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, ReactNode } from "react";
 
 interface NeonTextProps {
   children: ReactNode;
+  onMirageClick?: () => void;
 }
 
-export default function NeonText({ children }: NeonTextProps) {
+export default function NeonText({ children, onMirageClick }: NeonTextProps) {
   const textRef = useRef<HTMLParagraphElement>(null);
   const [flickerIntensity, setFlickerIntensity] = useState(0.97);
   
@@ -44,6 +45,37 @@ export default function NeonText({ children }: NeonTextProps) {
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
+
+  // Function to process the text and add the special mirage trigger
+  const processText = (text: string) => {
+    if (!text || !onMirageClick) return text;
+    
+    // Find "this is a mirage" in the text
+    const miragePhrase = "this is a mirage";
+    const lowerText = text.toLowerCase();
+    const index = lowerText.indexOf(miragePhrase);
+    
+    if (index === -1) return text;
+    
+    // Split the text into three parts: before, the phrase, and after
+    const before = text.substring(0, index);
+    const phrase = text.substring(index, index + miragePhrase.length);
+    const after = text.substring(index + miragePhrase.length);
+    
+    return (
+      <>
+        {before}
+        <span 
+          className="cursor-pointer hover:text-[#00FF41] transition-colors duration-300"
+          onClick={onMirageClick}
+          style={{ textDecoration: 'none' }}
+        >
+          {phrase}
+        </span>
+        {after}
+      </>
+    );
+  };
   
   return (
     <p 
@@ -51,7 +83,7 @@ export default function NeonText({ children }: NeonTextProps) {
       className="text-center text-sm md:text-base lg:text-lg tracking-wider font-light leading-relaxed animate-flicker mt-10"
       style={{ opacity: flickerIntensity, color: "#eeeeee" }}
     >
-      {children}
+      {typeof children === 'string' ? processText(children) : children}
     </p>
   );
 }
