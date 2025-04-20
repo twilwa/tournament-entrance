@@ -6,6 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 2: production image
@@ -15,6 +16,7 @@ WORKDIR /app
 # Only install production dependencies
 COPY package.json package-lock.json ./
 RUN npm ci --only=production
+ENV NODE_ENV=production
 
 # Copy build artifacts from builder
 COPY --from=builder /app/dist ./dist
