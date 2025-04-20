@@ -20,15 +20,18 @@ export type ChatCompletionResponse = {
   }[];
 };
 
-// Send a chat completion request
-export async function sendChatRequest(messages: Message[]): Promise<string> {
+// Send a chat completion request (with optional model override)
+export async function sendChatRequest(
+  messages: Message[],
+  model: string = 'arliai/qwq-32b-arliai-rpr-v1:free'
+): Promise<string> {
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, model }),
     });
 
     if (!response.ok) {
@@ -49,7 +52,9 @@ export function streamChatRequest(
   messages: Message[],
   onChunk: (chunk: string) => void,
   onDone: () => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  model: string = 'arliai/qwq-32b-arliai-rpr-v1:free',
+  reasoningExclude: boolean = true
 ) {
   // Create a fetch request for streaming
   let controller: AbortController | null = new AbortController();
@@ -57,12 +62,16 @@ export function streamChatRequest(
 
   (async () => {
     try {
+      // Build streaming request body, excluding reasoning tokens if requested
+      const body: any = { messages, model };
+      // Body expects reasoning:{exclude:boolean}
+      body.reasoning = { exclude: reasoningExclude };
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify(body),
         signal,
       });
 
@@ -107,8 +116,11 @@ export function streamChatRequest(
             
             try {
               const data = JSON.parse(dataStr);
+              // Prefer content tokens, but fall back to reasoning tokens if present
               if (data.content) {
                 onChunk(data.content);
+              } else if (data.reasoning) {
+                onChunk(data.reasoning);
               }
               if (data.error) {
                 throw new Error(data.error);

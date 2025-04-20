@@ -3,7 +3,7 @@ import CountdownTimer from "@/components/CountdownTimer";
 import NeonText from "@/components/NeonText";
 import ParticleBackground from "@/components/ParticleBackground";
 import TalkingHead from "@/components/TalkingHead";
-import { Message, streamChatRequest } from "@/lib/aiService";
+import { Message, streamChatRequest, sendChatRequest } from "@/lib/aiService";
 
 export default function Home() {
   const [chatActive, setChatActive] = useState(false);
@@ -34,7 +34,6 @@ export default function Home() {
   
   const [userInput, setUserInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [streamingText, setStreamingText] = useState('');
   
   const isReverseAnimating = useRef(false);
   const abortControllerRef = useRef<(() => void) | null>(null);
@@ -51,7 +50,7 @@ export default function Home() {
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingText]);
+  }, [messages]);
   
   // Interactive effects
   useEffect(() => {
@@ -171,74 +170,55 @@ export default function Home() {
     }, 10); // Much faster deletion timer
   };
 
-  // Send message to the AI
+  // Send message to the AI with streaming placeholder
   const handleSendMessage = async () => {
     if (!userInput.trim() || isThinking) return;
-    
-    // Add user message
+
+    // Prepare messages for QwQ: send system, history, user, then stub assistant <think> to kick off reasoning
     const userMessage: Message = { role: 'user', content: userInput };
-    setMessages(prev => [...prev, userMessage]);
+    const stubMessage: Message = { role: 'assistant', content: '<think>\n' };
+    const baseMessages = messages.filter(m => m.role !== 'system');
+    const messagesToSend = [...baseMessages, userMessage, stubMessage];
+    // Prepend system message at front
+    messagesToSend.unshift(messages[0]);
+
+    // Add user + placeholder assistant
+    setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '' }]);
     setUserInput('');
     setIsThinking(true);
-    setStreamingText('');
 
-    try {
-      // Get all messages for context, excluding the system message
-      const messagesToSend = [...messages, userMessage];
-      
-      // Set up streaming for response
-      let responseText = '';
-      
-      // Cancel any existing stream
-      if (abortControllerRef.current) {
-        abortControllerRef.current();
-      }
-      
-      // Start streaming the response
-      abortControllerRef.current = streamChatRequest(
-        messagesToSend,
-        (chunk) => {
-          responseText += chunk;
-          setStreamingText(responseText);
-        },
-        () => {
-          // When streaming is complete
-          setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
-          setStreamingText('');
-          setIsThinking(false);
-          abortControllerRef.current = null;
-          
-          // Check for completion markers in the response
-          const lowerResponse = responseText.toLowerCase();
-          if (!userProgress.interests && (lowerResponse.includes('interest') || lowerResponse.includes('passion'))) {
-            setUserProgress(prev => ({ ...prev, interests: true }));
-          }
-          else if (userProgress.interests && !userProgress.skills && 
-                  (lowerResponse.includes('skill') || lowerResponse.includes('tool') || lowerResponse.includes('language'))) {
-            setUserProgress(prev => ({ ...prev, skills: true }));
-          }
-          else if (userProgress.interests && userProgress.skills && !userProgress.background && 
-                  (lowerResponse.includes('background') || lowerResponse.includes('history'))) {
-            setUserProgress(prev => ({ ...prev, background: true }));
-          }
-          else if (userProgress.interests && userProgress.skills && userProgress.background && !userProgress.dreams && 
-                  (lowerResponse.includes('dream') || lowerResponse.includes('create') || lowerResponse.includes('build'))) {
-            setUserProgress(prev => ({ ...prev, dreams: true }));
-          }
-        },
-        (error) => {
-          console.error('Streaming error:', error);
-          setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
-          setIsThinking(false);
-          setStreamingText('');
-          abortControllerRef.current = null;
-        }
-      );
-    } catch (error) {
-      console.error('Failed to get response:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. The connection is unstable.' }]);
-      setIsThinking(false);
-    }
+    // Cancel any existing stream
+    abortControllerRef.current?.();
+
+    // Start streaming the response, including reasoning tokens in content
+    let finalAnswer = '';
+    abortControllerRef.current = streamChatRequest(
+      messagesToSend,
+      (chunk) => {
+        finalAnswer += chunk;
+        setMessages(prev => {
+          const copy = [...prev];
+          const idx = copy.length - 1;
+          copy[idx].content = finalAnswer;
+          return copy;
+        });
+      },
+      () => {
+        setIsThinking(false);
+      },
+      (error) => {
+        console.error('Streaming error:', error);
+        setMessages(prev => {
+          const copy = [...prev];
+          const idx = copy.length - 1;
+          copy[idx].content = 'Connection unstable. The digital sidewalk seems to be glitching...';
+          return copy;
+        });
+        setIsThinking(false);
+      },
+      'arliai/qwq-32b-arliai-rpr-v1:free', // model
+      false // include chain-of-thought in content
+    );
   };
 
   return (
@@ -289,44 +269,20 @@ export default function Home() {
                     </div>
                   ))}
                   
-                  {/* Streaming text display */}
-                  {streamingText && (
-                    <div className="text-left">
-                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
-                        <p className="whitespace-pre-wrap">{streamingText}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Thinking indicator */}
-                  {isThinking && !streamingText && (
-                    <div className="text-left">
-                      <div className="inline-block bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-2 rounded">
-                        <div className="flex space-x-2 items-center h-6">
-                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse"></div>
-                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div ref={messagesEndRef} />
-                </div>
-                
-                {/* Chat input */}
-                <div className="mt-4 flex items-center border-b border-[#00FF41]/30 pb-2">
-                  <input
-                    type="text"
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="flex-1 bg-transparent border-none focus:outline-none text-white"
-                    placeholder="Type your message..."
-                    disabled={isThinking}
-                  />
-                  {/* Glowing green dot cursor/indicator */}
-                  <div className={`green-dot-cursor ml-2 ${isThinking ? 'opacity-0' : ''}`}></div>
+                  {/* Chat input */}
+                  <div className="mt-4 flex items-center border-b border-[#00FF41]/30 pb-2">
+                    <input
+                      type="text"
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      className="flex-1 bg-transparent border-none focus:outline-none text-white"
+                      placeholder="Type your message..."
+                      disabled={isThinking}
+                    />
+                    {/* Glowing green dot cursor/indicator */}
+                    <div className={`green-dot-cursor ml-2 ${isThinking ? 'opacity-0' : ''}`}></div>
+                  </div>
                 </div>
               </div>
             )}

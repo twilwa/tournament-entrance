@@ -147,22 +147,17 @@ export default function TalkingHead({ isActive }: TalkingHeadProps) {
     // Add connection lines between particles to create a wireframe effect
     const drawConnections = (ctx: CanvasRenderingContext2D) => {
       const maxDist = 30; // Maximum distance for connection
-      
       ctx.strokeStyle = "rgba(0, 255, 65, 0.15)"; // Subtle green connections
       ctx.lineWidth = 0.5;
-      
       for (let i = 0; i < particles.length; i++) {
         const p1 = particles[i];
-        
         // Only draw connections for a subset of particles to avoid too many lines
-        if (Math.random() > 0.7) continue;
-        
+        if (Math.random() > 0.3) continue; // Lower threshold for more connections
         for (let j = i + 1; j < particles.length; j++) {
           const p2 = particles[j];
           const dx = p1.x - p2.x;
           const dy = p1.y - p2.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          
           if (dist < maxDist) {
             // Draw line with opacity based on distance
             ctx.beginPath();

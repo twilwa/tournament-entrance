@@ -49,7 +49,7 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingText]);
+  }, [messages]);
 
   // Clean up any active streams when component unmounts
   useEffect(() => {
@@ -60,75 +60,83 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
     };
   }, []);
 
+  // Simple markdown parser to convert *italic* to <em>italic</em>
+  const parseMarkdown = (text: string) => {
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\r?\n/g, '<br/>');
+  };
+
   const handleSendMessage = async () => {
     if (!input.trim() || isThinking) return;
     
-    // Add user message to chat
+    // Prepare messages: system, history, user then assistant stub to trigger reasoning
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const systemMessage = messages[0];
+    const history = messages.filter(m => m.role !== 'system');
+    const assistantStub: Message = { role: 'assistant', content: '<think>\n' };
+    const messagesToSend: Message[] = [
+      systemMessage,
+      ...history,
+      userMessage,
+      assistantStub
+    ];
+
+    // Update UI: show user message and enter streaming state
+    setMessages(prev => [...prev, userMessage, assistantStub]);
     setInput('');
     setIsThinking(true);
     setStreamingText('');
 
-    try {
-      // Filter out system messages for the API request
-      const messagesToSend = [...messages.filter(m => m.role !== 'system'), userMessage];
-      
-      // Add the system message
-      messagesToSend.unshift(messages[0]);
+    // Cancel any existing stream
+    abortControllerRef.current?.();
 
-      // Set up streaming for response
-      let responseText = '';
-      
-      // Cancel any existing stream
-      if (abortControllerRef.current) {
-        abortControllerRef.current();
-      }
-      
-      // Start streaming the response
-      abortControllerRef.current = streamChatRequest(
-        messagesToSend,
-        (chunk) => {
-          responseText += chunk;
-          setStreamingText(responseText);
-        },
-        () => {
-          // When streaming is complete
-          setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
-          setStreamingText('');
-          setIsThinking(false);
-          abortControllerRef.current = null;
-          
-          // Check for completion markers in the response
-          const lowerResponse = responseText.toLowerCase();
-          if (!userProgress.interests && (lowerResponse.includes('interest') || lowerResponse.includes('passion'))) {
-            setUserProgress(prev => ({ ...prev, interests: true }));
-          }
-          else if (userProgress.interests && !userProgress.skills && 
-                  (lowerResponse.includes('skill') || lowerResponse.includes('tool') || lowerResponse.includes('language'))) {
-            setUserProgress(prev => ({ ...prev, skills: true }));
-          }
-          else if (userProgress.interests && userProgress.skills && !userProgress.background && 
-                  (lowerResponse.includes('background') || lowerResponse.includes('history'))) {
-            setUserProgress(prev => ({ ...prev, background: true }));
-          }
-          else if (userProgress.interests && userProgress.skills && userProgress.background && !userProgress.dreams && 
-                  (lowerResponse.includes('dream') || lowerResponse.includes('create') || lowerResponse.includes('build'))) {
-            setUserProgress(prev => ({ ...prev, dreams: true }));
-          }
-        },
-        (error) => {
-          console.error('Streaming error:', error);
-          setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
-          setIsThinking(false);
-          setStreamingText('');
-          abortControllerRef.current = null;
-        }
-      );
-    } catch (error) {
-      console.error('Failed to get response:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. The connection is unstable.' }]);
-      setIsThinking(false);
+    // Stream from QwQ-32B; include reasoning tokens inline
+    let responseBuffer = '';
+    abortControllerRef.current = streamChatRequest(
+      messagesToSend,
+      (chunk) => {
+        responseBuffer += chunk;
+        setStreamingText(responseBuffer);
+      },
+      () => {
+        // On streaming complete, append final assistant message
+        setMessages(prev => [...prev, { role: 'assistant', content: responseBuffer }]);
+        setStreamingText('');
+        setIsThinking(false);
+        abortControllerRef.current = null;
+        checkProgressMarkers(responseBuffer);
+      },
+      (error) => {
+        console.error('Streaming error:', error);
+        setStreamingText('');
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
+        setIsThinking(false);
+        abortControllerRef.current = null;
+      },
+      'arliai/qwq-32b-arliai-rpr-v1:free',
+      false
+    );
+  };
+
+  // Helper function to check progress markers in the response
+  const checkProgressMarkers = (responseText: string) => {
+    const lowerResponse = responseText.toLowerCase();
+    if (!userProgress.interests && (lowerResponse.includes('interest') || lowerResponse.includes('passion'))) {
+      setUserProgress(prev => ({ ...prev, interests: true }));
+    }
+    else if (userProgress.interests && !userProgress.skills && 
+            (lowerResponse.includes('skill') || lowerResponse.includes('tool') || lowerResponse.includes('language'))) {
+      setUserProgress(prev => ({ ...prev, skills: true }));
+    }
+    else if (userProgress.interests && userProgress.skills && !userProgress.background && 
+            (lowerResponse.includes('background') || lowerResponse.includes('history'))) {
+      setUserProgress(prev => ({ ...prev, background: true }));
+    }
+    else if (userProgress.interests && userProgress.skills && userProgress.background && !userProgress.dreams && 
+            (lowerResponse.includes('dream') || lowerResponse.includes('create') || lowerResponse.includes('build'))) {
+      setUserProgress(prev => ({ ...prev, dreams: true }));
     }
   };
 
@@ -158,22 +166,16 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
                       : 'bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <div
+                    className="text-sm whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: parseMarkdown(message.content) }}
+                  />
                 </div>
               </div>
             ))}
             
-            {/* Streaming text display */}
-            {streamingText && (
-              <div className="flex justify-start">
-                <div className="bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-3 rounded">
-                  <p className="text-sm whitespace-pre-wrap">{streamingText}</p>
-                </div>
-              </div>
-            )}
-            
             {/* Thinking animation when no streaming text */}
-            {isThinking && !streamingText && (
+            {isThinking && (
               <div className="flex justify-start">
                 <div className="bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-3 rounded">
                   <div className="flex space-x-2 items-center">
