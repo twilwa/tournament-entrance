@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Only install production dependencies
 COPY package.json package-lock.json ./
-RUN npm ci --only=production --omit=dev
+RUN npm ci --omit=dev --only=production
 ENV NODE_ENV=production
 
 # Copy build artifacts from builder

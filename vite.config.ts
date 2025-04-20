@@ -1,23 +1,31 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-export default defineConfig({
-  plugins: [
+// Only import dev dependencies in development mode
+const plugins = [];
+
+// Production checks to avoid importing dev dependencies
+if (process.env.NODE_ENV !== "production") {
+  // These imports will only be loaded in development mode
+  const react = await import("@vitejs/plugin-react").then(m => m.default);
+  const runtimeErrorOverlay = await import("@replit/vite-plugin-runtime-error-modal").then(m => m.default);
+  const themePlugin = await import("@replit/vite-plugin-shadcn-theme-json").then(m => m.default);
+  
+  plugins.push(
     react(),
     runtimeErrorOverlay(),
-    themePlugin(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-        ]
-      : []),
-  ],
+    themePlugin()
+  );
+
+  // Only add cartographer in development and when REPL_ID is defined
+  if (process.env.REPL_ID !== undefined) {
+    const cartographer = await import("@replit/vite-plugin-cartographer").then(m => m.cartographer);
+    plugins.push(cartographer());
+  }
+}
+
+export default defineConfig({
+  plugins,
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

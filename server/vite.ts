@@ -31,22 +31,29 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true,
   };
 
-  // Only import viteConfig in development mode
-  const viteConfig = await import("../vite.config.js").then(m => m.default);
-
-  const vite = await createViteServer({
-    ...viteConfig,
+  // In development, create a minimal config without direct imports
+  const config = {
     configFile: false,
+    resolve: {
+      alias: {
+        "@": path.resolve(import.meta.dirname, "..", "client", "src"),
+        "@shared": path.resolve(import.meta.dirname, "..", "shared"),
+        "@assets": path.resolve(import.meta.dirname, "..", "attached_assets"),
+      },
+    },
+    root: path.resolve(import.meta.dirname, "..", "client"),
+    server: serverOptions,
+    appType: "custom",
     customLogger: {
       ...viteLogger,
-      error: (msg, options) => {
+      error: (msg: string, options?: any) => {
         viteLogger.error(msg, options);
         process.exit(1);
       },
     },
-    server: serverOptions,
-    appType: "custom",
-  });
+  };
+
+  const vite = await createViteServer(config);
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
