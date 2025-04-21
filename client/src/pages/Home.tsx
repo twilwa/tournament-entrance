@@ -190,20 +190,41 @@ export default function Home() {
     // Cancel any existing stream
     abortControllerRef.current?.();
 
-    // Start streaming the response, including reasoning tokens in content
-    let finalAnswer = '';
+    // Start streaming the response
+    let responseContent = '';
+    let reasoningContent = '';
+    
     abortControllerRef.current = streamChatRequest(
       messagesToSend,
-      (chunk) => {
-        finalAnswer += chunk;
-        setMessages(prev => {
-          const copy = [...prev];
-          const idx = copy.length - 1;
-          copy[idx].content = finalAnswer;
-          return copy;
-        });
+      (chunk, isReasoning) => {
+        if (isReasoning) {
+          // Store reasoning content but don't display it directly
+          reasoningContent += chunk;
+          // Optional: could log or handle reasoning in a separate UI element
+          console.log('Reasoning:', chunk);
+        } else {
+          // Update content displayed to user
+          responseContent += chunk;
+          setMessages(prev => {
+            const copy = [...prev];
+            const idx = copy.length - 1;
+            copy[idx].content = responseContent;
+            return copy;
+          });
+        }
       },
       () => {
+        // Streaming complete
+        if (responseContent.trim() === '' && reasoningContent.trim() !== '') {
+          // We got reasoning but no actual response content - treat as error
+          console.warn("Only received reasoning, no response content");
+          setMessages(prev => {
+            const copy = [...prev];
+            const idx = copy.length - 1;
+            copy[idx].content = 'Connection unstable. The digital sidewalk seems to be glitching...';
+            return copy;
+          });
+        }
         setIsThinking(false);
       },
       (error) => {
@@ -217,7 +238,7 @@ export default function Home() {
         setIsThinking(false);
       },
       'arliai/qwq-32b-arliai-rpr-v1:free', // model
-      false // include chain-of-thought in content
+      false // include reasoning content
     );
   };
 

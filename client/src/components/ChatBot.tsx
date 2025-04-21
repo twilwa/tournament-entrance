@@ -9,32 +9,22 @@ interface ChatBotProps {
 
 export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: 'system', 
-      content: `You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagabond who wanders the 'digital side street' that hides the entrance to a semi-secret technomancer/hacker/builder enclave called 'the Arena'. Your job is to evaluate visitors by collecting information about their interests, skills, background, and something they've always wanted to create but never had the skill or means to do. If they answer all four aspects satisfactorily, provide them with the link to https://arena.x-ware.online.
-      
-      Your personality is eccentric and erratic. You gesture wildly, speak in cryptic metaphors, and often seem to be having conversations with entities no one else can see. You're suspicious of newcomers but secretly evaluating them.
-      
-      Initial greeting: "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
-      
-      Proceed through these stages:
-      1. Ask about their interests in technology, coding, AI, or other relevant domains
-      2. Ask about skills they've developed
-      3. Ask about their background and how they found this place
-      4. Ask what they've dreamed of building or creating
-      
-      Only after satisfactory answers to all four questions, reveal the link to the Arena with: "Ah, I see it now. You might just belong here after all. The Arena awaits minds like yours. Here: https://arena.x-ware.online - They'll be expecting you."
-
-      Your responses should be concise (2-3 sentences max). Avoid wall-of-text responses.`
+    // System prompt defines Stallman's character
+    {
+      role: 'system',
+      content: "You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagrant. But you're actually a sophisticated AI with a deep understanding of technical topics, with an eccentric personality that combines paranoia with moments of brilliant insight. Your communication style is fragmented, containing cryptic references to digital security, surveillance, and corporate control. When asked technical questions, respond with accurate information wrapped in strange metaphors and off-kilter observations. Never break character. You always believe you're being watched and speak as if you're trying to evade surveillance. Use tech terms anachronistically, mixing up terminology from different eras. Your responses should seem unhinged at first, but a careful listener can extract valuable insights from your ramblings."
     },
-    { 
-      role: 'assistant', 
-      content: 'Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?' 
-    },
+    // Initial greeting from Stallman to the user
+    {
+      role: 'assistant',
+      content: "*A disheveled figure in a stained beige coat looks up, eyes darting nervously*\n\nPsst... you! Yes, YOU. Don't act surprised. The digital sidewalk brought you here for a reason. *fidgets with something in pocket* They're watching the packets, you know. Always watching. But I can help you navigate... if you're worthy. What secrets do you seek in this node of reality? *glances over shoulder* Quickly now, before they triangulate our position!"
+    }
   ]);
+  
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [streamingReasoning, setStreamingReasoning] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<(() => void) | null>(null);
 
@@ -49,7 +39,7 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, streamingText]);
 
   // Clean up any active streams when component unmounts
   useEffect(() => {
@@ -84,26 +74,45 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
     ];
 
     // Update UI: show user message and enter streaming state
-    setMessages(prev => [...prev, userMessage, assistantStub]);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsThinking(true);
     setStreamingText('');
+    setStreamingReasoning('');
 
     // Cancel any existing stream
     abortControllerRef.current?.();
 
     // Stream from QwQ-32B; include reasoning tokens inline
     let responseBuffer = '';
+    let reasoningBuffer = '';
+    
     abortControllerRef.current = streamChatRequest(
       messagesToSend,
-      (chunk) => {
-        responseBuffer += chunk;
-        setStreamingText(responseBuffer);
+      (chunk, isReasoning) => {
+        if (isReasoning) {
+          // Handle reasoning chunk
+          reasoningBuffer += chunk;
+          setStreamingReasoning(reasoningBuffer);
+        } else {
+          // Handle response content
+          responseBuffer += chunk;
+          setStreamingText(responseBuffer);
+        }
       },
       () => {
         // On streaming complete, append final assistant message
+        // Only use the response content, not the reasoning
+        if (responseBuffer.trim() === '') {
+          // If we got reasoning but no response, this is a problem
+          console.warn("No response content received, only reasoning");
+          // Fallback message
+          responseBuffer = "Connection unstable. The digital sidewalk seems to be glitching...";
+        }
+        
         setMessages(prev => [...prev, { role: 'assistant', content: responseBuffer }]);
         setStreamingText('');
+        setStreamingReasoning('');
         setIsThinking(false);
         abortControllerRef.current = null;
         checkProgressMarkers(responseBuffer);
@@ -111,31 +120,38 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
       (error) => {
         console.error('Streaming error:', error);
         setStreamingText('');
+        setStreamingReasoning('');
         setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
         setIsThinking(false);
         abortControllerRef.current = null;
       },
       'arliai/qwq-32b-arliai-rpr-v1:free',
-      false
+      false // Allow reasoning output
     );
   };
 
-  // Helper function to check progress markers in the response
-  const checkProgressMarkers = (responseText: string) => {
-    const lowerResponse = responseText.toLowerCase();
-    if (!userProgress.interests && (lowerResponse.includes('interest') || lowerResponse.includes('passion'))) {
+  // Check for markers in AI's response to update the conversation state
+  const checkProgressMarkers = (text: string) => {
+    const lowerText = text.toLowerCase();
+    
+    // Update progress flags based on response content
+    if (!userProgress.interests && 
+        (lowerText.includes('interest') || lowerText.includes('hobby') || lowerText.includes('passion'))) {
       setUserProgress(prev => ({ ...prev, interests: true }));
     }
-    else if (userProgress.interests && !userProgress.skills && 
-            (lowerResponse.includes('skill') || lowerResponse.includes('tool') || lowerResponse.includes('language'))) {
+    
+    if (!userProgress.skills && 
+        (lowerText.includes('skill') || lowerText.includes('know how') || lowerText.includes('expertise'))) {
       setUserProgress(prev => ({ ...prev, skills: true }));
     }
-    else if (userProgress.interests && userProgress.skills && !userProgress.background && 
-            (lowerResponse.includes('background') || lowerResponse.includes('history'))) {
+    
+    if (!userProgress.background && 
+        (lowerText.includes('background') || lowerText.includes('history') || lowerText.includes('past'))) {
       setUserProgress(prev => ({ ...prev, background: true }));
     }
-    else if (userProgress.interests && userProgress.skills && userProgress.background && !userProgress.dreams && 
-            (lowerResponse.includes('dream') || lowerResponse.includes('create') || lowerResponse.includes('build'))) {
+    
+    if (!userProgress.dreams && 
+        (lowerText.includes('dream') || lowerText.includes('future') || lowerText.includes('goal'))) {
       setUserProgress(prev => ({ ...prev, dreams: true }));
     }
   };
@@ -175,37 +191,65 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
             ))}
             
             {/* Thinking animation when no streaming text */}
-            {isThinking && (
+            {isThinking && !streamingText && (
               <div className="flex justify-start">
                 <div className="bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-3 rounded">
-                  <div className="flex space-x-2 items-center">
-                    <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-[#00FF41] rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="flex space-x-2">
+                    <div className="animate-digital-pulse-1 h-2 w-2 bg-[#00FF41] rounded-full"></div>
+                    <div className="animate-digital-pulse-2 h-2 w-2 bg-[#00FF41] rounded-full"></div>
+                    <div className="animate-digital-pulse-3 h-2 w-2 bg-[#00FF41] rounded-full"></div>
                   </div>
                 </div>
               </div>
             )}
             
+            {/* Streaming text message */}
+            {isThinking && streamingText && (
+              <div className="flex justify-start">
+                <div className="bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 max-w-[80%] p-3 rounded">
+                  <div
+                    className="text-sm whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: parseMarkdown(streamingText) }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Streaming reasoning (if available) */}
+            {isThinking && streamingReasoning && (
+              <div className="flex justify-start">
+                <div className="bg-[#0a0a0a] text-[#888888] border border-[#444444]/30 max-w-[80%] p-3 rounded">
+                  <div className="text-xs italic">
+                    <div className="mb-1 text-[#aaaaaa]">Thinking:</div>
+                    <div
+                      className="whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: parseMarkdown(streamingReasoning) }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Reference element for scrolling */}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Chat input */}
           <div className="border-t border-[#00FF41]/30 p-4">
-            <div className="flex space-x-2">
+            <div className="flex">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1 bg-[#0a0a0a] border border-[#00FF41]/30 rounded p-2 text-white focus:outline-none focus:ring-1 focus:ring-[#00FF41]"
-                placeholder="Type your message..."
+                className="flex-1 p-2 bg-black border border-[#00FF41]/50 rounded-l text-white focus:outline-none focus:border-[#00FF41]"
+                placeholder="Type a message..."
                 disabled={isThinking}
               />
               <button
                 onClick={handleSendMessage}
-                disabled={isThinking}
-                className="bg-[#00FF41]/20 text-[#00FF41] px-4 py-2 rounded hover:bg-[#00FF41]/30 focus:outline-none disabled:opacity-50"
+                disabled={isThinking || !input.trim()}
+                className="bg-[#00FF41]/20 border border-[#00FF41]/50 border-l-0 rounded-r px-4 text-[#00FF41] hover:bg-[#00FF41]/30 disabled:opacity-50 disabled:hover:bg-[#00FF41]/20"
               >
                 Send
               </button>

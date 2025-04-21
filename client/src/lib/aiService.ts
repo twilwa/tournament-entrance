@@ -1,9 +1,10 @@
 // AI Service for client-side interaction with the OpenRouter API
 
-export type Message = {
-  role: 'user' | 'assistant' | 'system';
+// Define message structure for chat
+export interface Message {
+  role: 'system' | 'user' | 'assistant';
   content: string;
-};
+}
 
 export type ChatCompletionResponse = {
   id: string;
@@ -20,39 +21,39 @@ export type ChatCompletionResponse = {
   }[];
 };
 
-// Send a chat completion request (with optional model override)
+// Function to send a chat request (non-streaming)
 export async function sendChatRequest(
-  messages: Message[],
+  messages: Message[], 
   model: string = 'arliai/qwq-32b-arliai-rpr-v1:free'
 ): Promise<string> {
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ messages, model }),
-    });
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messages, model }),
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to get AI response');
-    }
-
-    const data: ChatCompletionResponse = await response.json();
-    return data.choices[0]?.message?.content || '';
-  } catch (error) {
-    console.error('Error in sendChatRequest:', error);
-    throw error;
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to get response');
   }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || '';
 }
+
+// Define callback types for streaming
+type ChunkCallback = (chunk: string, isReasoning?: boolean) => void;
+type DoneCallback = () => void;
+type ErrorCallback = (error: Error) => void;
 
 // Initialize a streaming chat request
 export function streamChatRequest(
   messages: Message[],
-  onChunk: (chunk: string) => void,
-  onDone: () => void,
-  onError: (error: Error) => void,
+  onChunk: ChunkCallback,
+  onDone: DoneCallback,
+  onError: ErrorCallback,
   model: string = 'arliai/qwq-32b-arliai-rpr-v1:free',
   reasoningExclude: boolean = true
 ) {
@@ -66,6 +67,7 @@ export function streamChatRequest(
       const body: any = { messages, model };
       // Body expects reasoning:{exclude:boolean}
       body.reasoning = { exclude: reasoningExclude };
+      
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
@@ -116,11 +118,12 @@ export function streamChatRequest(
             
             try {
               const data = JSON.parse(dataStr);
-              // Prefer content tokens, but fall back to reasoning tokens if present
+              // Check for content or reasoning specifically
               if (data.content) {
-                onChunk(data.content);
+                onChunk(data.content, false);
               } else if (data.reasoning) {
-                onChunk(data.reasoning);
+                // Explicitly mark reasoning chunks
+                onChunk(data.reasoning, true);
               }
               if (data.error) {
                 throw new Error(data.error);
@@ -128,7 +131,7 @@ export function streamChatRequest(
             } catch (parseError) {
               // If it's not JSON, treat it as a raw text chunk
               if (dataStr && dataStr !== '[DONE]') {
-                onChunk(dataStr);
+                onChunk(dataStr, false);
               }
             }
           }

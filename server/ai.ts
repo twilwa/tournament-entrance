@@ -1,14 +1,15 @@
 import OpenAI from "openai";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 
-// Configure OpenAI client to use OpenRouter
-export const openai = new OpenAI({
+// Initialize OpenAI client with OpenRouter config
+const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY || "",
   baseURL: "https://openrouter.ai/api/v1",
   defaultHeaders: {
-    "HTTP-Referer": "https://the-arena.repl.co", // Required for OpenRouter
-    "X-Title": "The Arena",
-  },
+    "HTTP-Referer": "https://the-arena.repl.co",
+    // Required for OpenRouter
+    "X-Title": "The Arena"
+  }
 });
 
 // Handler for chat completion
@@ -41,7 +42,12 @@ export async function handleChatCompletion(req: Request, res: Response) {
 // Handler for streaming chat completion
 export async function handleStreamingChatCompletion(req: Request, res: Response) {
   try {
-    const { messages, model = "arliai/qwq-32b-arliai-rpr-v1:free", fallbackModel = "deepseek/deepseek-chat-v3-0324:free", reasoning } = req.body;
+    const { 
+      messages, 
+      model = "arliai/qwq-32b-arliai-rpr-v1:free", 
+      fallbackModel = "deepseek/deepseek-chat-v3-0324", 
+      reasoning 
+    } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "Invalid messages format" });
@@ -60,13 +66,26 @@ export async function handleStreamingChatCompletion(req: Request, res: Response)
       stream: true,
       max_tokens: 800,
     };
+
+    // Handle both boolean and object formats for backward compatibility
     if (reasoning !== undefined) {
-      createOpts.reasoning = reasoning;
+      if (typeof reasoning === 'object' && reasoning !== null) {
+        // New format: { exclude: boolean }
+        createOpts.reasoning = reasoning;
+      } else if (typeof reasoning === 'boolean') {
+        // Old format: boolean (true = include, false = exclude)
+        createOpts.reasoning = { exclude: !reasoning };
+      } else {
+        // Default to exclude
+        createOpts.reasoning = { exclude: true };
+      }
     }
+
     const stream = await openai.chat.completions.create(createOpts);
 
     let hasContent = false;
-    let accumulatedContent = "";
+    let reasoningContent = '';
+    let actualContent = '';
 
     for await (const chunk of stream) {
       // Get content from delta
@@ -76,21 +95,26 @@ export async function handleStreamingChatCompletion(req: Request, res: Response)
       // Check if we have actual content
       if (content && content.trim()) {
         hasContent = true;
-        accumulatedContent += content;
+        actualContent += content;
         res.write(`data: ${JSON.stringify({ content })}\n\n`);
       } else {
         // Try to access reasoning through any available property
-        // This is a workaround since 'reasoning' is not in the type definition
         const anyDelta = delta as any;
         if (anyDelta.reasoning && typeof anyDelta.reasoning === 'string') {
-          accumulatedContent += anyDelta.reasoning;
-          res.write(`data: ${JSON.stringify({ content: anyDelta.reasoning })}\n\n`);
+          reasoningContent += anyDelta.reasoning;
+          // Send reasoning content with a special property
+          res.write(`data: ${JSON.stringify({ reasoning: anyDelta.reasoning })}\n\n`);
         }
       }
     }
 
     // If no content was generated, try the fallback model
-    if (!hasContent || accumulatedContent.trim() === "") {
+    if (!hasContent || actualContent.trim() === "") {
+      // If we have reasoning but no content, that's strange - log it
+      if (reasoningContent.trim() !== "") {
+        console.warn("Received reasoning but no content from model, switching to fallback");
+      }
+      
       res.write(`data: ${JSON.stringify({ content: "Switching to fallback model..." })}\n\n`);
       
       const fallbackCompletion = await openai.chat.completions.create({
