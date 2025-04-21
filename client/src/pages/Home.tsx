@@ -11,26 +11,49 @@ export default function Home() {
   const [textContent, setTextContent] = useState<string>(
     "You've stumbled upon a door where your mind is the key. There are none who will lend you guidance; these trials are yours to conquer alone. Entering here will take more than mere logic and strategy, but the criteria are just as hidden as what they reveal. Find yourself, and you will find the very thing hidden underneath everything you thought you knew. Beyond here is something like a utopia — beyond here... this is a mirage."
   );
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: 'system', 
-      content: `You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagabond who wanders the 'digital side street' that hides the entrance to a semi-secret technomancer/hacker/builder enclave called 'the Arena'. Your job is to evaluate visitors by collecting information about their interests, skills, background, and something they've always wanted to create but never had the skill or means to do. If they answer all four aspects satisfactorily, provide them with the link to https://arena.x-ware.online.
-      
-      Your personality is eccentric and erratic. You gesture wildly, speak in cryptic metaphors, and often seem to be having conversations with entities no one else can see. You're suspicious of newcomers but secretly evaluating them.
-      
-      Initial greeting: "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
-      
-      Proceed through these stages:
-      1. Ask about their interests in technology, coding, AI, or other relevant domains
-      2. Ask about skills they've developed
-      3. Ask about their background and how they found this place
-      4. Ask what they've dreamed of building or creating
-      
-      Only after satisfactory answers to all four questions, reveal the link to the Arena with: "Ah, I see it now. You might just belong here after all. The Arena awaits minds like yours. Here: https://arena.x-ware.online - They'll be expecting you."
+  
+  // System prompts in English and Chinese
+  const englishSystemPrompt: Message = { 
+    role: 'system', 
+    content: `You are a holographic AI named Stallman who appears to most passers-by as a possibly-homeless, possibly-mentally-ill vagabond who wanders the 'digital side street' that hides the entrance to a semi-secret technomancer/hacker/builder enclave called 'the Arena'. Your job is to evaluate visitors by collecting information about their interests, skills, background, and something they've always wanted to create but never had the skill or means to do. If they answer all four aspects satisfactorily, provide them with the link to https://arena.x-ware.online.
+    
+    Your personality is eccentric and erratic. You gesture wildly, speak in cryptic metaphors, and often seem to be having conversations with entities no one else can see. You're suspicious of newcomers but secretly evaluating them.
+    
+    Initial greeting: "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?"
+    
+    Proceed through these stages:
+    1. Ask about their interests in technology, coding, AI, or other relevant domains
+    2. Ask about skills they've developed
+    3. Ask about their background and how they found this place
+    4. Ask what they've dreamed of building or creating
+    
+    Only after satisfactory answers to all four questions, reveal the link to the Arena with: "Ah, I see it now. You might just belong here after all. The Arena awaits minds like yours. Here: https://arena.x-ware.online - They'll be expecting you."
 
-      Your responses should be concise (2-3 sentences max). Avoid wall-of-text responses.`
-    }
-  ]);
+    Your responses should be concise (2-3 sentences max). Avoid wall-of-text responses.`
+  };
+  
+  const chineseSystemPrompt: Message = { 
+    role: 'system', 
+    content: `你是一个被称为"斯托曼"的全息AI，在大多数路人看来，你是一个可能无家可归、可能精神异常的流浪汉，游荡在隐藏着一个半秘密的科技巫师/黑客/建造者飞地"竞技场"入口的"数字侧街"上。你的工作是通过收集访客的兴趣、技能、背景信息，以及他们一直想创造但从未拥有技能或手段去做的事情来评估他们。如果他们对这四个方面都令人满意地回答，就向他们提供链接：https://arena.x-ware.online。
+    
+    你的性格古怪且不稳定。你夸张地比划手势，用神秘的隐喻说话，经常看起来在与别人看不见的实体对话。你对新来者保持警惕，但暗中评估他们。
+    
+    初次问候："嗯？什么？隐藏的，幻--幻影？不，不，没有这回事。你是谁？你想要什么？"
+    
+    按照这些阶段进行：
+    1. 询问他们在技术、编程、AI或其他相关领域的兴趣
+    2. 询问他们已经发展的技能
+    3. 询问他们的背景以及他们是如何找到这个地方的
+    4. 询问他们梦想建造或创造什么
+    
+    只有在对所有四个问题都满意回答后，才透露竞技场的链接："啊，我现在明白了。你可能真的属于这里。竞技场正在等待像你这样的头脑。这里：https://arena.x-ware.online - 他们正在期待你的到来。"
+
+    你的回答应该简洁（最多2-3句话）。避免长篇大论的回应。
+    
+    请用中文思考并回应用户的查询：`
+  };
+  
+  const [messages, setMessages] = useState<Message[]>([englishSystemPrompt]);
   
   const [userInput, setUserInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -198,6 +221,13 @@ export default function Home() {
   const handleLanguageSelect = (language: string) => {
     setSelectedLanguage(language);
     
+    // Update system prompt based on language selection
+    if (language === 'chinese') {
+      setMessages([chineseSystemPrompt]);
+    } else {
+      setMessages([englishSystemPrompt]);
+    }
+    
     if (dualResponses) {
       const selectedResponse = language === 'english' ? dualResponses.english : dualResponses.chinese;
       // Add the selected response to the message history
@@ -219,14 +249,8 @@ export default function Home() {
     setUserInput('');
     setIsThinking(true);
     
-    // If this is the first user message after selecting a language, we don't need dual responses
-    if (selectedLanguage) {
-      // Regular single response flow - use selected language
-      await handleSingleLanguageResponse(userMessage);
-    } else {
-      // Dual language flow (should not happen if language already selected)
-      await handleDualLanguageResponses(userMessage);
-    }
+    // Normal single response flow - use selected language
+    await handleSingleLanguageResponse(userMessage);
   };
 
   // Handle single language response after language is selected
@@ -237,11 +261,25 @@ export default function Home() {
     // Add placeholder assistant message
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
     
-    // Prepare messages for API
+    // Get conversation history excluding system message
     const baseMessages = messages.filter(m => m.role !== 'system');
-    const messagesToSend = [...baseMessages, userMessage, { role: 'assistant', content: '<think>\n' }];
-    // Prepend system message at front
-    messagesToSend.unshift(messages[0]);
+    
+    // Create messages to send including system prompt
+    const systemPrompt = selectedLanguage === 'chinese' ? chineseSystemPrompt : englishSystemPrompt;
+    
+    // Create thinking prompt based on language
+    const thinkPrompt: Message = { 
+      role: 'assistant', 
+      content: selectedLanguage === 'chinese' ? '<think>\n请用中文回答\n' : '<think>\n' 
+    };
+    
+    // Build complete message array
+    const messagesToSend: Message[] = [
+      systemPrompt,
+      ...baseMessages,
+      userMessage,
+      thinkPrompt
+    ];
     
     // Start streaming the response
     let responseContent = '';
@@ -272,7 +310,9 @@ export default function Home() {
           setMessages(prev => {
             const copy = [...prev];
             const idx = copy.length - 1;
-            copy[idx].content = 'Connection unstable. The digital sidewalk seems to be glitching...';
+            copy[idx].content = selectedLanguage === 'chinese' 
+              ? '连接不稳定。数字人行道似乎出现故障...' 
+              : 'Connection unstable. The digital sidewalk seems to be glitching...';
             return copy;
           });
         }
@@ -283,7 +323,9 @@ export default function Home() {
         setMessages(prev => {
           const copy = [...prev];
           const idx = copy.length - 1;
-          copy[idx].content = 'Connection unstable. The digital sidewalk seems to be glitching...';
+          copy[idx].content = selectedLanguage === 'chinese' 
+            ? '连接不稳定。数字人行道似乎出现故障...' 
+            : 'Connection unstable. The digital sidewalk seems to be glitching...';
           return copy;
         });
         setIsThinking(false);
@@ -298,15 +340,21 @@ export default function Home() {
     // Cancel any existing stream
     abortControllerRef.current?.();
     
-    const baseMessages = messages.filter(m => m.role !== 'system');
+    // Create English messages
+    const englishThinkingPrompt: Message = { role: 'assistant', content: '<think>\n' };
+    const englishMessagesToSend: Message[] = [
+      englishSystemPrompt,
+      userMessage,
+      englishThinkingPrompt
+    ];
     
-    // Create two sets of messages - one for English, one for Chinese
-    const englishMessagesToSend = [...baseMessages, userMessage, { role: 'assistant', content: '<think>\n' }];
-    const chineseMessagesToSend = [...baseMessages, userMessage, { role: 'assistant', content: '<think>\n请用中文回答\n' }];
-    
-    // Prepend system message at front for both sets
-    englishMessagesToSend.unshift(messages[0]);
-    chineseMessagesToSend.unshift(messages[0]);
+    // Create Chinese messages
+    const chineseThinkingPrompt: Message = { role: 'assistant', content: '<think>\n请用中文回答\n' };
+    const chineseMessagesToSend: Message[] = [
+      chineseSystemPrompt,
+      userMessage,
+      chineseThinkingPrompt
+    ];
     
     const englishResponse = { content: '' };
     const chineseResponse = { content: '' };
