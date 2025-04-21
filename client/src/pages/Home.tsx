@@ -35,6 +35,10 @@ export default function Home() {
   const [userInput, setUserInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   
+  // Language selection state
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [dualResponses, setDualResponses] = useState<{english: string, chinese: string} | null>(null);
+  
   const isReverseAnimating = useRef(false);
   const abortControllerRef = useRef<(() => void) | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -156,10 +160,11 @@ export default function Home() {
         clearInterval(deleteInterval);
         
         // When done erasing, show the chat interface
-        const initialMessage = "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?";
-        setMessages(prev => [...prev, { role: 'assistant', content: initialMessage }]);
         setChatActive(true);
         isReverseAnimating.current = false;
+        
+        // Start dual language initial messages
+        handleInitialDualResponses();
         return;
       }
       
@@ -170,26 +175,74 @@ export default function Home() {
     }, 10); // Much faster deletion timer
   };
 
-  // Send message to the AI with streaming placeholder
+  // Handle initial dual responses in English and Chinese
+  const handleInitialDualResponses = async () => {
+    setIsThinking(true);
+    
+    // Initial greeting in English
+    const initialEnglishPrompt = "Hm? What? Hidden, behi--mirage? No, no, nothing of the sort. Who are you? What do you want?";
+    
+    // Initial greeting in Chinese
+    const initialChinesePrompt = "嗯？什么？隐藏的，幻--幻影？不，不，没有这回事。你是谁？你想要什么？";
+    
+    // Set initial dual responses
+    setDualResponses({
+      english: initialEnglishPrompt,
+      chinese: initialChinesePrompt
+    });
+    
+    setIsThinking(false);
+  };
+
+  // Handle user selecting a language preference
+  const handleLanguageSelect = (language: string) => {
+    setSelectedLanguage(language);
+    
+    if (dualResponses) {
+      const selectedResponse = language === 'english' ? dualResponses.english : dualResponses.chinese;
+      // Add the selected response to the message history
+      setMessages(prev => [...prev, { role: 'assistant', content: selectedResponse }]);
+      // Clear the dual responses
+      setDualResponses(null);
+    }
+  };
+
+  // Send message to the AI with streaming
   const handleSendMessage = async () => {
     if (!userInput.trim() || isThinking) return;
 
-    // Prepare messages for QwQ: send system, history, user, then stub assistant <think> to kick off reasoning
+    // Prepare user message
     const userMessage: Message = { role: 'user', content: userInput };
-    const stubMessage: Message = { role: 'assistant', content: '<think>\n' };
-    const baseMessages = messages.filter(m => m.role !== 'system');
-    const messagesToSend = [...baseMessages, userMessage, stubMessage];
-    // Prepend system message at front
-    messagesToSend.unshift(messages[0]);
-
-    // Add user + placeholder assistant
-    setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '' }]);
+    
+    // Add user message to the chat
+    setMessages(prev => [...prev, userMessage]);
     setUserInput('');
     setIsThinking(true);
+    
+    // If this is the first user message after selecting a language, we don't need dual responses
+    if (selectedLanguage) {
+      // Regular single response flow - use selected language
+      await handleSingleLanguageResponse(userMessage);
+    } else {
+      // Dual language flow (should not happen if language already selected)
+      await handleDualLanguageResponses(userMessage);
+    }
+  };
 
+  // Handle single language response after language is selected
+  const handleSingleLanguageResponse = async (userMessage: Message) => {
     // Cancel any existing stream
     abortControllerRef.current?.();
-
+    
+    // Add placeholder assistant message
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    
+    // Prepare messages for API
+    const baseMessages = messages.filter(m => m.role !== 'system');
+    const messagesToSend = [...baseMessages, userMessage, { role: 'assistant', content: '<think>\n' }];
+    // Prepend system message at front
+    messagesToSend.unshift(messages[0]);
+    
     // Start streaming the response
     let responseContent = '';
     let reasoningContent = '';
@@ -198,9 +251,8 @@ export default function Home() {
       messagesToSend,
       (chunk, isReasoning) => {
         if (isReasoning) {
-          // Store reasoning content but don't display it directly
+          // Store reasoning content but don't display it
           reasoningContent += chunk;
-          // Optional: could log or handle reasoning in a separate UI element
           console.log('Reasoning:', chunk);
         } else {
           // Update content displayed to user
@@ -216,7 +268,6 @@ export default function Home() {
       () => {
         // Streaming complete
         if (responseContent.trim() === '' && reasoningContent.trim() !== '') {
-          // We got reasoning but no actual response content - treat as error
           console.warn("Only received reasoning, no response content");
           setMessages(prev => {
             const copy = [...prev];
@@ -237,9 +288,90 @@ export default function Home() {
         });
         setIsThinking(false);
       },
-      'arliai/qwq-32b-arliai-rpr-v1:free', // model
-      false // include reasoning content
+      'arliai/qwq-32b-arliai-rpr-v1:free',
+      false
     );
+  };
+
+  // Handle dual language responses
+  const handleDualLanguageResponses = async (userMessage: Message) => {
+    // Cancel any existing stream
+    abortControllerRef.current?.();
+    
+    const baseMessages = messages.filter(m => m.role !== 'system');
+    
+    // Create two sets of messages - one for English, one for Chinese
+    const englishMessagesToSend = [...baseMessages, userMessage, { role: 'assistant', content: '<think>\n' }];
+    const chineseMessagesToSend = [...baseMessages, userMessage, { role: 'assistant', content: '<think>\n请用中文回答\n' }];
+    
+    // Prepend system message at front for both sets
+    englishMessagesToSend.unshift(messages[0]);
+    chineseMessagesToSend.unshift(messages[0]);
+    
+    const englishResponse = { content: '' };
+    const chineseResponse = { content: '' };
+    let englishComplete = false;
+    let chineseComplete = false;
+    
+    // English stream
+    const englishAbortController = streamChatRequest(
+      englishMessagesToSend,
+      (chunk, isReasoning) => {
+        if (!isReasoning) {
+          englishResponse.content += chunk;
+          // Update dual responses as we stream
+          setDualResponses(current => ({
+            english: englishResponse.content,
+            chinese: current?.chinese || ''
+          }));
+        }
+      },
+      () => {
+        englishComplete = true;
+        if (chineseComplete) setIsThinking(false);
+      },
+      (error) => {
+        console.error('English streaming error:', error);
+        englishResponse.content = 'Connection unstable. The digital sidewalk seems to be glitching...';
+        englishComplete = true;
+        if (chineseComplete) setIsThinking(false);
+      },
+      'arliai/qwq-32b-arliai-rpr-v1:free',
+      false
+    );
+    
+    // Chinese stream
+    const chineseAbortController = streamChatRequest(
+      chineseMessagesToSend,
+      (chunk, isReasoning) => {
+        if (!isReasoning) {
+          chineseResponse.content += chunk;
+          // Update dual responses as we stream
+          setDualResponses(current => ({
+            english: current?.english || '',
+            chinese: chineseResponse.content
+          }));
+        }
+      },
+      () => {
+        chineseComplete = true;
+        if (englishComplete) setIsThinking(false);
+      },
+      (error) => {
+        console.error('Chinese streaming error:', error);
+        chineseResponse.content = '连接不稳定。数字人行道似乎出现故障...';
+        chineseComplete = true;
+        if (englishComplete) setIsThinking(false);
+      },
+      'arliai/qwq-32b-arliai-rpr-v1:free',
+      false
+    );
+    
+    // Combine abort controllers
+    abortControllerRef.current = () => {
+      englishAbortController();
+      chineseAbortController();
+    };
   };
 
   return (
@@ -290,6 +422,29 @@ export default function Home() {
                     </div>
                   ))}
                   
+                  {/* Dual language response selector */}
+                  {dualResponses && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div 
+                        className="bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 p-3 rounded cursor-pointer hover:bg-[#002a10] transition-colors"
+                        onClick={() => handleLanguageSelect('english')}
+                      >
+                        <div className="text-[#00FF41] opacity-70 mb-1 text-xs">English</div>
+                        <p className="whitespace-pre-wrap">{dualResponses.english}</p>
+                      </div>
+                      <div 
+                        className="bg-[#001a08] text-[#00FF41] border border-[#00FF41]/30 p-3 rounded cursor-pointer hover:bg-[#002a10] transition-colors"
+                        onClick={() => handleLanguageSelect('chinese')}
+                      >
+                        <div className="text-[#00FF41] opacity-70 mb-1 text-xs">中文</div>
+                        <p className="whitespace-pre-wrap">{dualResponses.chinese}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Reference for scrolling to bottom */}
+                  <div ref={messagesEndRef}></div>
+                  
                   {/* Chat input */}
                   <div className="mt-4 flex items-center border-b border-[#00FF41]/30 pb-2">
                     <input
@@ -299,7 +454,7 @@ export default function Home() {
                       onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                       className="flex-1 bg-transparent border-none focus:outline-none text-white"
                       placeholder="Type your message..."
-                      disabled={isThinking}
+                      disabled={isThinking || dualResponses !== null}
                     />
                     {/* Glowing green dot cursor/indicator */}
                     <div className={`green-dot-cursor ml-2 ${isThinking ? 'opacity-0' : ''}`}></div>
