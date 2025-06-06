@@ -106,6 +106,8 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
         if (responseBuffer.trim() === '') {
           // If we got reasoning but no response, this is a problem
           console.warn("No response content received, only reasoning");
+          console.log('Response buffer was empty. Reasoning buffer:', reasoningBuffer);
+          console.log('Messages sent:', messagesToSend);
           // Fallback message
           responseBuffer = "Connection unstable. The digital sidewalk seems to be glitching...";
         }
@@ -119,14 +121,19 @@ export default function ChatBot({ isOpen, onClose }: ChatBotProps) {
       },
       (error) => {
         console.error('Streaming error:', error);
+        console.log('Error details:', { 
+          message: error.message, 
+          stack: error.stack,
+          messagesToSend 
+        });
         setStreamingText('');
         setStreamingReasoning('');
         setMessages(prev => [...prev, { role: 'assistant', content: 'Connection unstable. The digital sidewalk seems to be glitching...' }]);
         setIsThinking(false);
         abortControllerRef.current = null;
       },
-      'arliai/qwq-32b-arliai-rpr-v1:free',
-      false // Allow reasoning output
+      'deepseek/deepseek-chat:free',
+      true // Exclude reasoning output for deepseek
     );
   };
 

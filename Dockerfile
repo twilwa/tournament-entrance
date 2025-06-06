@@ -21,8 +21,13 @@ ENV NODE_ENV=production
 # Copy build artifacts from builder
 COPY --from=builder /app/dist ./dist
 
+# Environment variables (can be overridden at runtime)
+# For OpenRouter, use OPENAI_API_KEY with your OpenRouter API key
+ENV OPENAI_API_KEY=""
+ENV OPENROUTER_API_KEY=""
+
 # Expose the port the server listens on
-EXPOSE 5000
+EXPOSE 1382
 
 # Start the server in production mode
 CMD ["npm", "start"] 

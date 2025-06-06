@@ -1,0 +1,41 @@
+# Dependency directories
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.vite/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development/test files
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Task management
+.taskmaster/
+tasks/
+
+# Other
+.cursor/
+.roo/
+.specstory/
+.windsurfrules
+attached_assets/
+test/

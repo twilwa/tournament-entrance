@@ -285,16 +285,24 @@ export default function Home() {
     let responseContent = '';
     let reasoningContent = '';
     
+    console.log('🚀 Starting streamChatRequest with messages:', messagesToSend.map(m => ({
+      role: m.role,
+      contentPreview: m.content.slice(0, 100) + (m.content.length > 100 ? '...' : '')
+    })));
+    
     abortControllerRef.current = streamChatRequest(
       messagesToSend,
       (chunk, isReasoning) => {
+        console.log('📦 Received chunk:', { chunk: chunk.slice(0, 50), isReasoning, chunkLength: chunk.length });
+        
         if (isReasoning) {
           // Store reasoning content but don't display it
           reasoningContent += chunk;
-          console.log('Reasoning:', chunk);
+          console.log('🧠 Reasoning chunk received:', chunk.slice(0, 100));
         } else {
           // Update content displayed to user
           responseContent += chunk;
+          console.log('✨ Content chunk received:', chunk);
           setMessages(prev => {
             const copy = [...prev];
             const idx = copy.length - 1;
@@ -305,8 +313,27 @@ export default function Home() {
       },
       () => {
         // Streaming complete
+        console.log('🏁 Stream complete:', {
+          responseContentLength: responseContent.length,
+          responseContentTrimmed: responseContent.trim(),
+          reasoningContentLength: reasoningContent.length,
+          hasResponseContent: responseContent.trim() !== '',
+          hasReasoningContent: reasoningContent.trim() !== ''
+        });
+        
         if (responseContent.trim() === '' && reasoningContent.trim() !== '') {
-          console.warn("Only received reasoning, no response content");
+          console.warn("⚠️ Only received reasoning, no response content");
+          console.log("🧠 Full reasoning content:", reasoningContent);
+          setMessages(prev => {
+            const copy = [...prev];
+            const idx = copy.length - 1;
+            copy[idx].content = selectedLanguage === 'chinese' 
+              ? '连接不稳定。数字人行道似乎出现故障...' 
+              : 'Connection unstable. The digital sidewalk seems to be glitching...';
+            return copy;
+          });
+        } else if (responseContent.trim() === '') {
+          console.warn("⚠️ No content received at all");
           setMessages(prev => {
             const copy = [...prev];
             const idx = copy.length - 1;
@@ -319,7 +346,7 @@ export default function Home() {
         setIsThinking(false);
       },
       (error) => {
-        console.error('Streaming error:', error);
+        console.error('❌ Streaming error:', error);
         setMessages(prev => {
           const copy = [...prev];
           const idx = copy.length - 1;
@@ -440,7 +467,7 @@ export default function Home() {
         <div className="max-w-2xl w-full">
           {/* Countdown section */}
           <div className="text-center mb-12">
-            <CountdownTimer targetDate="May 30, 2025 00:00:00" />
+            <CountdownTimer targetDate="June 13, 2025 00:00:00" />
           </div>
           
           {/* Main message area - transforms into chat interface */}

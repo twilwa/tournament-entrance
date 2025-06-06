@@ -68,6 +68,14 @@ export function streamChatRequest(
       // Body expects reasoning:{exclude:boolean}
       body.reasoning = { exclude: reasoningExclude };
       
+      console.log('🚀 Client: Starting stream request with:', {
+        model,
+        messageCount: messages.length,
+        reasoningExclude,
+        lastMessage: messages[messages.length - 1]
+      });
+      
+      console.log('📤 Client: Sending request to /api/chat/stream');
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: {
@@ -75,6 +83,11 @@ export function streamChatRequest(
         },
         body: JSON.stringify(body),
         signal,
+      });
+      console.log('📥 Client: Response received:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
@@ -108,6 +121,7 @@ export function streamChatRequest(
             
             if (dataStr === '[DONE]') {
               // Streaming complete
+              console.log('✅ Client: Stream complete - [DONE] received');
               if (controller) {
                 reader.cancel();
                 controller = null;
@@ -118,6 +132,12 @@ export function streamChatRequest(
             
             try {
               const data = JSON.parse(dataStr);
+              console.log('📦 Client: Parsed data chunk:', { 
+                hasContent: !!data.content,
+                hasReasoning: !!data.reasoning,
+                hasError: !!data.error,
+                dataKeys: Object.keys(data)
+              });
               // Check for content or reasoning specifically
               if (data.content) {
                 onChunk(data.content, false);

@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import path from "path";
 
 // Only import dev dependencies in development mode
@@ -40,22 +40,32 @@ async function devOnlyPlugins() {
 
 // vite.config.ts
 import react from '@vitejs/plugin-react'
+import { apiPlugin } from './client/vite-plugin-api'
 
-export default defineConfig({
-  plugins: [
-    react(),               // ① always include react plugin
-    ...await devOnlyPlugins(),   // ② keep the dev‑time plugins conditional
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+export default defineConfig(async ({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  // Make env vars available to the API plugin
+  process.env.OPENAI_API_KEY = env.OPENAI_API_KEY || env.OPENROUTER_API_KEY;
+  
+  return {
+    plugins: [
+      react(),               // ① always include react plugin
+      ...await devOnlyPlugins(),   // ② keep the dev‑time plugins conditional
+      apiPlugin(),           // Add API plugin for handling AI requests
+    ],
+    resolve: {
+      alias: {
+        "@": path.resolve(import.meta.dirname, "client", "src"),
+        "@shared": path.resolve(import.meta.dirname, "shared"),
+        "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      },
     },
-  },
-  root: path.resolve(import.meta.dirname, "client"),
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
-  },
+    root: path.resolve(import.meta.dirname, "client"),
+    build: {
+      outDir: path.resolve(import.meta.dirname, "dist/public"),
+      emptyOutDir: true,
+    },
+  };
 });
