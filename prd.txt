@@ -1,0 +1,187 @@
+<context>
+# Overview  
+The Digital-Twin Portal is a chat-first “everything box” that replaces a static résumé with an interactive AI concierge.  
+• Problem: Your work, content and availability are scattered across GitHub, Obsidian, Zotero, YouTube, social networks and a calendar. Visitors must hunt or message you for links, context and scheduling.  
+• Solution: A single, minimalist UI to start, which reconfigures on-demand where an agent can 1) surface any of your public or permissioned assets, 2) book time with you and 3) even spin up demo deployments—all through natural language.  
+• Audience: recruiters, collaborators, learners and the AI-curious who prefer a conversation to a clunky navigationBelow is a cleaned-up, opinionated rewrite that keeps the spirit (“chat-first, minimal, extensible”) while trimming the bloat and calling out the true must-haves. I preserved the original section structure so the document can drop straight into your repo or Notion.
+<context>
+# Overview  
+The Digital-Twin Portal turns your scattered online footprint into a single conversational entry-point. Visitors arrive at a blank canvas, chat with an AI agent that knows your work, and seamlessly:  
+• Explore code, notes, papers, talks and social signals.  
+• Book time on your calendar.  
+• Spin up live demos of Dockerized projects on your VPS.  
+It is an intelligent résumé, knowledge base and sandbox rolled into one.
+Core Features
+
+Generative Chat UI
+
+• What: React Server Components (RSC) stream the exact UI needed—resource cards, calendar picker, deployment tiles—inside a terminal-style chat surface.
+
+• Why: Minimal chrome, maximal focus; no buried menus.
+
+• How: Vercel AI SDK for streaming, TanStack Router for shallow navigation.
+
+
+Unified Knowledge Graph
+
+• What: GitHub stars/commits, Obsidian vault, Zotero library, YouTube playlist, LinkedIn/X connections; all semantically searchable.
+
+• Why: Gives the agent full context and lets users ask anything.
+
+• How: Ingestion workers generate embeddings (pgvector + Postgres) and store raw docs in S3-compatible storage.
+
+
+Intelligent Scheduling
+
+• What: Natural-language booking powered by Cal.com’s open scheduling APIs cal.com.
+
+• Why: Removes “What time works?” friction.
+
+• How: Agent calls Cal.com endpoints, streams available slots, confirms and writes to Google Calendar.
+
+
+One-Click Deploy Playground
+
+• What: Users can spin up live demos of repos you flag as “deployable.”
+
+• Why: Lets collaborators kick the tires without Git-cloning.
+
+• How: Agent issues signed requests to Coolify on your VPS; status updates streamed back to chat.
+
+
+Web3 / Classic Auth + Payments
+
+• What: Sign-in via Particle Connect or Dynamic.xyz smart accounts; fallback to email or (soon) “Sign in with ChatGPT” when OpenAI exposes it techcrunch.com.
+
+• Why: Future-proof, crypto-friendly; Stripe for fiat/crypto checkout.
+
+
+Tool-Calling Agent Framework
+
+• What: Arcade.dev provides hardened, auth-aware tool calls so the LLM can safely hit email, calendar, deployment, etc. arcade.dev.
+
+• Why: Keeps credentials off the model and enforces scopes.
+
+• How: Agent uses ElizaOS wrappers that delegate to Arcade connectors.
+
+</context>
+
+<PRD>
+# Technical Architecture  
+System Components
+
+• Frontend: Next.js 15 w/ App Router, RSC, Tailwind.
+
+• State/Data: TanStack Query; tRPC for typed APIs.
+
+• Agent Runtime: ElizaOS + Composio tool calls.
+
+
+• DB: Postgres + pgvector (Neon or self-host).
+
+• Search: Hybrid semantic (pgvector) + keyword fallback.
+
+• File/Object Storage: S3 (Wasabi or MinIO on VPS).
+
+• Queue / Jobs: Node workers with BullMQ.
+
+• Hosting: Coolify on VPS for API + jobs; Vercel optional for static edge.
+
+Data Models (trimmed to essentials)
+
+User { id, walletAddr?, email?, roles[] }
+
+Profile { userId, interests[], skills[], bio, lastActive }
+
+Resource { id, source, type, title, tags[], vector, url, rawPath }
+
+Conversation { id, userId, msgs[], intent, createdAt }
+
+APIs & Integrations
+
+External: GitHub, Cal.com, Google Calendar, YouTube, Zotero (webDAV export), X/Twitter, LinkedIn, Stripe.
+
+Internal: /chat (stream), /search, /schedule, /deploy, /ingest, /profile.
+
+Infrastructure Requirements
+
+• 2 vCPU/4 GB VPS (dev) scaling to 4 vCPU/8 GB (prod).
+
+• Postgres 15 with pgvector extension.
+
+• Redis 6 for sessions + queues.
+
+• Cloudflare proxy & CDN.
+
+Development Roadmap (scope only, no dates)
+Phase 0 – Spike
+
+• Hello-world RSC chat with OpenAI completion.
+
+• Wallet + email auth stub.
+
+Phase 1 – MVP “Talk & Peek”
+
+• Auth (wallet & email).
+
+• Streaming chat UI.
+
+• GitHub stars + commits ingestion.
+
+• Semantic search across GitHub.
+
+• Basic profile auto-fill (languages, top repos).
+
+• Manual Cal.com booking via command (“/book”).
+
+Phase 2 – Deep Knowledge
+
+• Obsidian + Zotero ingestion pipelines.
+
+• Unified search with filters.
+
+• Intent detection → auto-layout UI (resource grid, code viewer).
+
+• Calendar write-back + reschedule flow.
+
+Phase 3 – Actionable Twin
+
+• Coolify deploy tool (repo ➜ container).
+
+• Discord bridge (agent in server).
+
+• Stripe checkout for paid consulting slots.
+
+Phase 4 – Network & Scale
+
+• Social graph (who booked, shared interests).
+
+• Public share links for generated views.
+
+• Multi-tenant: allow other creators to spin up their own twins.
+
+Logical Dependency Chain
+
+Auth → 2. Core chat → 3. Data ingestion → 4. Vector search →
+
+Intent router → 6. Generative UI → 7. Scheduling → 8. Deploy → 9. Payments/Network.
+
+Risks & Mitigations
+• Too many data connectors → start GitHub-only; add one per phase.
+
+• RSC streaming complexity → ship plain chat HTML first, then progressive enhancement.
+
+• LLM leaking private data → enforce Arcade scope + redaction middleware.
+
+• API rate limits → nightly batch ingestion & cache.
+
+• Scope creep → every new capability must map to a clear user intent (explore, schedule, deploy, pay).
+
+Appendix
+• Scheduling UX references Cal.com’s open-source frontend for inspiration cal.com.
+
+• Secure tool execution pattern influenced by Arcade’s “authenticated connectors” model arcade.dev.
+
+• Potential future login flow aligns with OpenAI’s forthcoming identity layer techcrunch.com.
+
+</PRD>
